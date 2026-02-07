@@ -37,14 +37,19 @@ def create_filters(df: pd.DataFrame) -> dict:
     districts = ["Всички"] + sorted(df["District"].unique()) if has_district else []
     
     # 1. Регион
-    sel_region = st.sidebar.selectbox("1. Регион", regions, index=0)
+    sel_region = st.sidebar.selectbox(
+        "1. Регион",
+        regions,
+        index=0,
+        help="Географска област (София, Пловдив, Варна...) - избери \"Всички\" за национален преглед"
+    )
     
     # 2. Медикамент (основен продукт)
     sel_product = st.sidebar.selectbox(
         "2. Медикамент (основен)",
         drugs,
         index=0,
-        help="Твоят продукт – напр. Lipocante"
+        help="Твоят продукт за анализ – напр. Lipocante, Valsavil, Aerius"
     )
     
     # 3. Молекула - по подразбиране само молекулата на избрания продукт
@@ -56,14 +61,15 @@ def create_filters(df: pd.DataFrame) -> dict:
         "3. Молекула",
         molecules,
         default=default_mol,
-        help="Филтрирай по молекула – по подразбиране само твоята"
+        help="Активното вещество (напр. Pitavastatin, Valsartan) - по подразбиране само молекулата на избрания продукт"
     )
     
     # 4. Brick (район)
     sel_district = st.sidebar.selectbox(
         "4. Brick (район)",
         districts,
-        index=0
+        index=0,
+        help="Малък географски район в града (Лозенец, Дружба, Самоков...) - налично само ако имаш \"Total Bricks\" данни"
     ) if has_district else "Всички"
     
     # 5. Конкуренти - само от същата категория (Source)
@@ -120,7 +126,7 @@ def apply_filters(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
 
 def create_metric_selector() -> Tuple[str, bool]:
     """
-    Създава селектор за метрика (Units, EV Index, Market Share, Growth).
+    Създава селектор за метрика (Units, Market Share, Growth).
     
     Връща
     ------
@@ -128,7 +134,12 @@ def create_metric_selector() -> Tuple[str, bool]:
         (избрана_метрика, share_in_molecule)
     """
     st.sidebar.header("Метрика")
-    metric = st.sidebar.radio("Покажи", config.METRICS, index=0)
+    metric = st.sidebar.radio(
+        "Покажи",
+        config.METRICS,
+        index=0,
+        help="Избери каква метрика да виждаш в графиките"
+    )
     
     share_in_molecule = False
     if metric == "Market Share (%)":
@@ -136,8 +147,25 @@ def create_metric_selector() -> Tuple[str, bool]:
             "Дял спрямо",
             ["Цял клас (всички в категорията)", "Само молекулата (напр. само Pitavastatin)"],
             index=1,  # По подразбиране в молекулата
+            help="Изчислявай дял спрямо целия пазар или само спрямо избраната молекула"
         )
         share_in_molecule = "Само молекулата" in scope_choice
+    
+    # Глосар на термините
+    with st.sidebar.expander("ℹ️ Какво означава..."):
+        st.markdown("""
+        **Region** - Голяма географска област (София, Пловдив, Варна...)
+        
+        **Brick** - Малък район в града (Лозенец, Дружба, Самоков...)
+        
+        **Molecule** - Активното вещество в медикамента (напр. Pitavastatin, Valsartan)
+        
+        **Market Share** - Твоят дял от пазара в процент (%)
+        
+        **Units** - Брой продадени опаковки
+        
+        **% Ръст** - Промяна спрямо предишен период (позитивно = ръст, негативно = спад)
+        """)
     
     return metric, share_in_molecule
 

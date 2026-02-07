@@ -43,7 +43,8 @@ def create_period_comparison(
             "Период 1 (базов)",
             periods,
             index=max(0, len(periods) - 5),  # Преди 4 тримесечия
-            key="period1_comp"
+            key="period1_comp",
+            help="Избери стар период като база за сравнение"
         )
     
     with col2:
@@ -51,7 +52,8 @@ def create_period_comparison(
             "Период 2 (сравнителен)",
             periods,
             index=len(periods) - 1,  # Последен период
-            key="period2_comp"
+            key="period2_comp",
+            help="Избери нов период за да видиш промяната"
         )
     
     if period1 == period2:
