@@ -63,3 +63,20 @@ EXCEL_EXTENSIONS = [".xlsx", ".xls"]
 
 # Префикс за временни файлове (игнорираме)
 TEMP_FILE_PREFIX = ".~"
+
+# === STADA ПРОДУКТИ ===
+# Списък със STADA продукти за филтриране в Dashboard
+STADA_PRODUCTS = [
+    # Valsartan линия
+    "VALSAVIL", "VALSAVIL COMP", "VALSAVIL AM", "VALSAVIL AM TRIO",
+    # Statins
+    "LIPOCANTE", "ATEROSTAD",
+    # Антиплателетчици
+    "KALDERA SPM",
+    # Антихистамини
+    "CETIRISTAD", "EFESTAD",
+    # Nasal corticosteroids
+    "RHINOSTAD", "NASOSTAD",
+    # Cilostazol
+    "CILOSTAZOL STADA",
+]

@@ -151,22 +151,6 @@ def create_metric_selector() -> Tuple[str, bool]:
         )
         share_in_molecule = "Само молекулата" in scope_choice
     
-    # Глосар на термините
-    with st.sidebar.expander("ℹ️ Какво означава..."):
-        st.markdown("""
-        **Region** - Голяма географска област (София, Пловдив, Варна...)
-        
-        **Brick** - Малък район в града (Лозенец, Дружба, Самоков...)
-        
-        **Molecule** - Активното вещество в медикамента (напр. Pitavastatin, Valsartan)
-        
-        **Market Share** - Твоят дял от пазара в процент (%)
-        
-        **Units** - Брой продадени опаковки
-        
-        **% Ръст** - Промяна спрямо предишен период (позитивно = ръст, негативно = спад)
-        """)
-    
     return metric, share_in_molecule
 
 
