@@ -2,14 +2,16 @@
 Drug name → molecule (active ingredient) mapping.
 Used for filtering by molecule in the Pharma Data Viz app.
 Sources: EMA, FDA, pharmaceutical databases.
-Loads drug_molecules_cache.json for user-added / auto-discovered mappings.
+Loads from DRUG_MOLECULES.csv for easy editing.
 """
 
 import json
 import os
+import pandas as pd
 from pathlib import Path
 
 _CACHE_PATH = Path(__file__).parent / "drug_molecules_cache.json"
+_CSV_PATH = Path(__file__).parent / "DRUG_MOLECULES.csv"
 
 # Antihistamines (R06A)
 ANTIHISTAMINES = {
@@ -109,7 +111,32 @@ def _norm(s: str) -> str:
     return " ".join(s.strip().upper().split())
 
 
-# Merge built-in mappings
+def _load_from_csv():
+    """Load drug→molecule mappings from CSV file."""
+    if not _CSV_PATH.exists():
+        return {}
+    
+    try:
+        df = pd.read_csv(_CSV_PATH, comment='#', skip_blank_lines=True)
+        # Проверка дали има нужните колони
+        if 'Drug_Name' not in df.columns or 'Molecule' not in df.columns:
+            return {}
+        
+        # Създаване на mapping
+        mapping = {}
+        for _, row in df.iterrows():
+            drug = row.get('Drug_Name', '')
+            molecule = row.get('Molecule', '')
+            if drug and molecule and pd.notna(drug) and pd.notna(molecule):
+                mapping[_norm(str(drug))] = str(molecule).strip()
+        
+        return mapping
+    except Exception as e:
+        print(f"Warning: Could not load DRUG_MOLECULES.csv: {e}")
+        return {}
+
+
+# Merge built-in mappings (fallback)
 DRUG_TO_MOLECULE = {}
 for molecule, drugs in ANTIHISTAMINES.items():
     for d in drugs:
@@ -133,7 +160,15 @@ for molecule, drugs in ANTIPLATELETS.items():
     for d in drugs:
         DRUG_TO_MOLECULE[_norm(d)] = molecule
 
-# Load user cache
+# Load from CSV (приоритет пред built-in)
+csv_mappings = _load_from_csv()
+if csv_mappings:
+    print(f"OK Loaded {len(csv_mappings)} drug-molecule mappings from CSV")
+    DRUG_TO_MOLECULE.update(csv_mappings)
+else:
+    print("WARNING Using built-in drug-molecule mappings (CSV not found)")
+
+# Load user cache (приоритет пред всичко)
 DRUG_TO_MOLECULE.update(_load_cache())
 
 

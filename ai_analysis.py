@@ -175,7 +175,7 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
     ai_question = st.text_area(
         "Или напиши свой въпрос:",
         value=suggested_question if suggested_question else "",
-        placeholder="Защо Lipocante в Sofia East не расте толкова много колкото в Pleven?",
+        placeholder="Защо продажбите спадат в последните периоди?",
         height=100,
         key="ai_question",
         help="Задай конкретен въпрос за данните - колкото по-детайлен, толкова по-добър отговорът"

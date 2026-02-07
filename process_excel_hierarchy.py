@@ -176,8 +176,9 @@ def _fill_hierarchy(df: pd.DataFrame, row_types: dict) -> pd.DataFrame:
     df["District"] = col_a.where(row_types["is_district"])
     df["District"] = df["District"].ffill()
     
-    # Колона Drug_Name: запълни където е Drug ред, после ffill()
-    df["Drug_Name"] = col_a.where(row_types["is_drug"])
+    # Колона Drug_Name: запълни където е Drug ИЛИ Category ред
+    # Category редовете (ATC кодове) трябва да се запазват като Drug_Name
+    df["Drug_Name"] = col_a.where(row_types["is_drug"] | row_types["is_category"])
     df["Drug_Name"] = df["Drug_Name"].ffill()
     
     return df
@@ -262,9 +263,9 @@ def process_pharma_excel(
         # === 7. ПОПЪЛВАНЕ НА ЙЕРАРХИЯТА ===
         df = _fill_hierarchy(df, row_types)
         
-        # === 8. ФИЛТРИРАНЕ САМО НА DRUG РЕДОВЕ ===
-        # Оставяме само редовете с данни (Drug rows)
-        df_clean = df[row_types["is_drug"]].copy()
+        # === 8. ФИЛТРИРАНЕ НА DRUG И CATEGORY РЕДОВЕ ===
+        # Оставяме Drug редове (медикаменти) И Category редове (ATC класове с общи суми)
+        df_clean = df[row_types["is_drug"] | row_types["is_category"]].copy()
         df_clean = df_clean.reset_index(drop=True)
         
         # Премахване на col_a (вече имаме Drug_Name)

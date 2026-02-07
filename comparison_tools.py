@@ -89,9 +89,10 @@ def create_period_comparison(
     # Сортиране по Units_2
     comparison = comparison.sort_values("Units_2", ascending=False)
     
-    # Графика - grouped bar chart
+    # Графика - grouped bar chart с % промяна
     fig = go.Figure()
     
+    # Период 1
     fig.add_trace(go.Bar(
         name=period1,
         x=comparison["Drug_Name"],
@@ -99,19 +100,39 @@ def create_period_comparison(
         marker_color='lightblue',
         text=comparison["Units_1"].apply(lambda x: f"{int(x):,}"),
         textposition='outside',
+        hovertemplate="<b>%{x}</b><br>" + period1 + ": %{y:,.0f} опак.<extra></extra>",
     ))
+    
+    # Период 2 с % промяна (закръглена до 2 знака с индикатори)
+    def format_bar_text(row):
+        change = row['Change_%']
+        if change > 0:
+            return f"{int(row['Units_2']):,}<br>(🟢 +{change:.2f}%)"
+        elif change < 0:
+            return f"{int(row['Units_2']):,}<br>(🔴 {change:.2f}%)"
+        else:
+            return f"{int(row['Units_2']):,}<br>({change:.2f}%)"
+    
+    comparison["text_with_change"] = comparison.apply(format_bar_text, axis=1)
     
     fig.add_trace(go.Bar(
         name=period2,
         x=comparison["Drug_Name"],
         y=comparison["Units_2"],
         marker_color='darkblue',
-        text=comparison["Units_2"].apply(lambda x: f"{int(x):,}"),
+        text=comparison["text_with_change"],
         textposition='outside',
+        hovertemplate=(
+            "<b>%{x}</b><br>" + 
+            period2 + ": %{y:,.0f} опак.<br>" +
+            "Промяна: %{customdata:+.1f}%<extra></extra>"
+        ),
+        customdata=comparison["Change_%"],
     ))
     
     fig.update_layout(
         title=f"Сравнение: {period1} vs {period2}",
+        legend_title="",  # Премахнат заглавие на легендата
         xaxis_title="Продукт",
         yaxis_title="Опаковки",
         barmode='group',
@@ -119,12 +140,12 @@ def create_period_comparison(
         xaxis_tickangle=-45,
         legend=dict(
             orientation="h",
-            yanchor="bottom",
-            y=-0.3,
+            yanchor="top",
+            y=1.12,  # НАД графиката
             xanchor="center",
             x=0.5
         ),
-        margin=dict(b=120, t=80, l=50, r=50),
+        margin=dict(b=80, t=120, l=50, r=50),  # Повече място горе
         font=dict(size=12),
         hovermode="x unified"
     )
@@ -144,13 +165,31 @@ def create_period_comparison(
     display_df["Промяна (опак.)"] = display_df["Промяна (опак.)"].apply(
         lambda x: f"+{int(x):,}" if x > 0 else f"{int(x):,}"
     )
-    display_df["Промяна (%)"] = display_df["Промяна (%)"].apply(
-        lambda x: f"+{x:.1f}%" if x > 0 else f"{x:.1f}%"
-    )
+    # Промяна (%) с индикатори
+    def format_percent_with_icon(x):
+        if x > 0:
+            return f"🟢 +{x:.2f}%"
+        elif x < 0:
+            return f"🔴 {x:.2f}%"
+        else:
+            return f"{x:.2f}%"
     
-    # Стилизиране на таблицата
+    display_df["Промяна (%)"] = display_df["Промяна (%)"].apply(format_percent_with_icon)
+    
+    # Стилизиране на таблицата с оцветени проценти
+    def color_change(val):
+        """Оцвети процентите - зелено за +, червено за -"""
+        if isinstance(val, str) and "%" in val:
+            if "🟢" in val or val.startswith("+"):
+                return 'color: green; font-weight: bold'
+            elif "🔴" in val or val.startswith("-"):
+                return 'color: red; font-weight: bold'
+        return ''
+    
+    styled_df = display_df.style.applymap(color_change, subset=["Промяна (%)"])
+    
     st.dataframe(
-        display_df,
+        styled_df,
         use_container_width=True,
         height=min(400, len(display_df) * 35 + 50)
     )
@@ -213,6 +252,7 @@ def create_regional_comparison(
     
     fig.update_layout(
         title=f"Регионално разпределение - {period}",
+        legend_title="",  # Премахнат заглавие на легендата
         xaxis_title="Регион",
         yaxis_title="Опаковки",
         barmode='stack',
@@ -220,12 +260,12 @@ def create_regional_comparison(
         xaxis_tickangle=-45,
         legend=dict(
             orientation="h",
-            yanchor="bottom",
-            y=-0.3,
+            yanchor="top",
+            y=1.12,  # НАД графиката
             xanchor="center",
             x=0.5
         ),
-        margin=dict(b=120, t=80, l=50, r=50),
+        margin=dict(b=80, t=120, l=50, r=50),  # Повече място горе
         font=dict(size=12),
     )
     

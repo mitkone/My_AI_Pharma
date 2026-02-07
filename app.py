@@ -36,9 +36,10 @@ from ui_components import (
     calculate_metric_data,
     create_timeline_chart,
     create_brick_charts,
+    show_market_share_table,
+    calculate_regional_market_share,
 )
 from ai_analysis import render_ai_analysis_tab
-from drug_molecules import add_drug_to_cache
 from comparison_tools import create_period_comparison, create_regional_comparison
 
 
@@ -71,9 +72,9 @@ st.set_page_config(
 # ЗАГЛАВИЕ И ЗАРЕЖДАНЕ НА ДАННИ
 # ============================================================================
 
-st.title("📊 Pharma Sales Data")
+st.title("📊 STADA Rx Sales Data")
 st.markdown(
-    "**Регион** → **Медикамент** → **Молекула** → **Brick** – "
+    "**Регион** → **Медикамент** → **Brick** – "
     "избери медикамент от общата база"
 )
 
@@ -100,19 +101,6 @@ if "Source" in df_raw.columns:
     sources = sorted(df_raw["Source"].unique())
     st.sidebar.caption(f"Заредени: {', '.join(sources)}")
 
-# Бутон за обновяване на данните
-if st.sidebar.button("Обнови данните", help="При добавяне на нови Excel файлове"):
-    get_cached_data.clear()
-    st.rerun()
-
-# Статистика
-st.success(
-    f"**{len(df_raw):,}** реда | "
-    f"{df_raw['Region'].nunique()} региона | "
-    f"{df_raw['Drug_Name'].nunique()} продукта | "
-    f"{df_raw['Source'].nunique()} категории"
-)
-
 # Създаване на филтри
 filters = create_filters(df_raw)
 
@@ -122,26 +110,18 @@ df_filtered = apply_filters(df_raw, filters)
 # Селектор за метрика
 metric, share_in_molecule = create_metric_selector()
 
-# Добавяне на молекула (за админи)
-with st.sidebar.expander("➕ Добави молекула"):
-    new_drug = st.text_input("Препарат", placeholder="LIPOCANTE")
-    new_mol = st.text_input("Молекула", placeholder="Pitavastatin")
-    if st.button("Добави") and new_drug and new_mol:
-        add_drug_to_cache(new_drug.strip(), new_mol.strip())
-        st.success(f"Добавено: {new_drug} → {new_mol}")
-        st.rerun()
-
 
 # ============================================================================
 # ПОДГОТОВКА НА ДАННИ ЗА ВИЗУАЛИЗАЦИЯ
 # ============================================================================
 
-# Продукти за показване: основен + конкуренти
+# Продукти за показване: основен + конкуренти (вече включва класовете)
 products_on_chart = [filters["product"]] + [
     c for c in filters["competitors"] if c != filters["product"]
 ]
 
 # Филтриране само на избраните продукти
+# Класовете вече са в df_raw като отделни Drug_Name редове
 df_chart = df_filtered[df_filtered["Drug_Name"].isin(products_on_chart)].copy()
 
 # Сортиране на периодите
@@ -163,16 +143,15 @@ tab_timeline, tab_brick, tab_comparison, tab_ai = st.tabs([
 with tab_timeline:
     # Изчисляване на метриката
     df_agg, y_col, y_label = calculate_metric_data(
-        df=df_filtered,
+        df=df_filtered,  # Филтриран по регион/brick (за графиката)
         products_list=products_on_chart,
         periods=periods,
         metric=metric,
-        share_in_molecule=share_in_molecule,
-        molecule=filters["product_molecule"],
+        df_full=df_raw,  # Пълен национален dataset (за Market Share)
     )
     
-    # Създаване на линейна графика
-    create_timeline_chart(
+    # Създаване на линейна графика и Market Share таблица
+    df_agg_result = create_timeline_chart(
         df_agg=df_agg,
         y_col=y_col,
         y_label=y_label,
@@ -181,20 +160,22 @@ with tab_timeline:
         competitors=filters["competitors"],
     )
     
-    # Дял на продукта (ако има конкуренти)
-    if filters["competitors"] and filters["product"] in df_filtered["Drug_Name"].values:
-        total_by_q = df_filtered.groupby("Quarter")["Units"].sum()
-        me_by_q = df_filtered[
-            df_filtered["Drug_Name"] == filters["product"]
-        ].groupby("Quarter")["Units"].sum()
+    # Показване на Market Share таблици под графиката
+    if df_agg_result is not None:
+        # 1. Национален Market Share (винаги)
+        show_market_share_table(df_agg_result, period_col="Quarter", is_national=True)
         
-        share = (me_by_q / total_by_q.replace(0, float("nan")) * 100).round(1)
-        last_share = share.iloc[-1] if len(share) and not pd.isna(share.iloc[-1]) else 0
-        
-        st.metric(
-            f"Дял {filters['product']} (%) – последен период",
-            f"{last_share:.1f}%"
-        )
+        # 2. Регионален Market Share (само ако е избран конкретен регион)
+        if filters["region"] != "Всички":
+            st.markdown("---")
+            df_regional_share = calculate_regional_market_share(
+                df=df_filtered,
+                products_list=products_on_chart,
+                periods=periods,
+                period_col="Quarter"
+            )
+            if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
+                show_market_share_table(df_regional_share, period_col="Quarter", is_national=False)
 
 
 # --- ТАБ 2: ПО BRICK (РАЙОНИ) ---
