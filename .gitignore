@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Secrets - ВАЖНО: API ключовете НЕ трябва да се качват!
+.env
+
+# Excel backup files
+~$*.xlsx
+.~lock.*
+
+# Temporary and generated files
+*.log
+*_melted.csv
+*_old*.py
+*_backup.py
+test_*.py
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Streamlit
+.streamlit/secrets.toml
