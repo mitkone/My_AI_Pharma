@@ -753,12 +753,8 @@ def show_market_share_table(
         hovermode='x unified',
         hoverlabel=dict(
             bgcolor="white",
-            font_size=16,
-            font_family="Arial",
-            font_color="#1a1a1a",
             bordercolor="#333",
-            borderwidth=1,
-            padding=10,
+            font=dict(size=16, family="Arial", color="#1a1a1a"),
         ),
         dragmode=False,
         clickmode="event+select",
