@@ -749,10 +749,10 @@ def show_market_share_table(
         ),
         showlegend=True,
         legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.35,
-            xanchor="center",
+            orientation='h',
+            yanchor='bottom',
+            y=-0.2,
+            xanchor='center',
             x=0.5,
             font=dict(size=11),
         ),
@@ -766,7 +766,7 @@ def show_market_share_table(
         clickmode="event+select",
         autosize=False,
         uirevision='constant',
-        width=350,
+        width=600,
         height=800,
         margin=dict(l=70, r=10, t=30, b=30),
     )
@@ -774,7 +774,7 @@ def show_market_share_table(
     
     st.plotly_chart(
         fig,
-        use_container_width=False,
+        use_container_width=True,
         config={'displayModeBar': False, 'scrollZoom': False, 'responsive': False, 'doubleClick': False},
     )
     
