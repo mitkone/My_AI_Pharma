@@ -766,15 +766,16 @@ def show_market_share_table(
         clickmode="event+select",
         autosize=False,
         uirevision='constant',
-        height=700,
+        width=350,
+        height=800,
         margin=dict(l=70, r=10, t=30, b=30),
     )
     fig.update_traces(marker_line_width=1.5, opacity=0.9)
     
     st.plotly_chart(
         fig,
-        use_container_width=True,
-        config={'displayModeBar': False, 'scrollZoom': False},
+        use_container_width=False,
+        config={'displayModeBar': False, 'scrollZoom': False, 'responsive': False, 'doubleClick': False},
     )
     
     # Различни обяснения
