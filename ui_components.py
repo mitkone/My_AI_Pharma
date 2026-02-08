@@ -538,7 +538,8 @@ def create_timeline_chart(
         height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
         legend_title="",
         showlegend=True,
-        hovermode="x unified",
+        hovermode="closest",  # Click/tap elsewhere to dismiss tooltip
+        dragmode=False,       # Prevent accidental panning on mobile
         xaxis_tickangle=-45,
         xaxis=dict(
             categoryorder="array",
@@ -562,7 +563,7 @@ def create_timeline_chart(
         font=dict(size=12),
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
     
     # Връщаме и df_agg за да можем да покажем Market Share данни извън функцията
     return df_agg
@@ -742,12 +743,13 @@ def show_market_share_table(
             borderwidth=1,
             font=dict(size=12, family="Arial", color="black")
         ),
-        hovermode='x unified',
+        hovermode='closest',  # Click/tap elsewhere to dismiss tooltip
+        dragmode=False,       # Prevent accidental panning on mobile
         height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
         margin=dict(l=0, r=0, t=30, b=0)  # Минимални margins за mobile
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
     
     # Различни обяснения
     if is_national:
@@ -882,10 +884,12 @@ def create_brick_charts(
             xanchor="center",
             x=0.5
         ),
-        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins
+        hovermode='closest',
+        dragmode=False,
+        margin=dict(l=0, r=0, t=30, b=0),
         font=dict(size=12),
     )
-    st.plotly_chart(fig_geo, use_container_width=True)
+    st.plotly_chart(fig_geo, use_container_width=True, config=config.PLOTLY_CONFIG)
     
     # Stacked bar chart за дял
     total_by_x = df_geo.groupby(group_col)["Units"].sum()
@@ -932,7 +936,9 @@ def create_brick_charts(
             xanchor="center",
             x=0.5
         ),
-        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins
+        hovermode='closest',
+        dragmode=False,
+        margin=dict(l=0, r=0, t=30, b=0),
         font=dict(size=12),
     )
-    st.plotly_chart(fig_share, use_container_width=True)
+    st.plotly_chart(fig_share, use_container_width=True, config=config.PLOTLY_CONFIG)

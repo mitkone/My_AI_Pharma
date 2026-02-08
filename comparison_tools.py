@@ -151,10 +151,11 @@ def create_period_comparison(
         ),
         margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins
         font=dict(size=12),
-        hovermode="x unified"
+        hovermode="closest",  # Click/tap elsewhere to dismiss tooltip
+        dragmode=False        # Prevent accidental panning on mobile
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
     
     # Таблица с промени
     st.subheader("Промени (%)")
@@ -277,8 +278,10 @@ def create_regional_comparison(
             xanchor="center",
             x=0.5
         ),
-        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins
+        hovermode='closest',
+        dragmode=False,
+        margin=dict(l=0, r=0, t=30, b=0),
         font=dict(size=12),
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)

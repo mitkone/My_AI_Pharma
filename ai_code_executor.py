@@ -259,8 +259,10 @@ def create_mobile_friendly_figure(fig: go.Figure) -> go.Figure:
     # Mobile-first настройки
     fig.update_layout(
         height=500,  # Оптимална височина за mobile (matching config.MOBILE_CHART_HEIGHT)
-        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margin-и за mobile
+        margin=dict(l=0, r=0, t=30, b=0),
         font=dict(size=12),
+        hovermode='closest',
+        dragmode=False,
         legend=dict(
             orientation="h",
             yanchor="bottom",

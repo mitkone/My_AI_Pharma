@@ -54,6 +54,13 @@ BRICK_CHART_HEIGHT = 500
 TIMELINE_CHART_HEIGHT = 500
 COMPARISON_CHART_HEIGHT = 500
 
+# Plotly mobile config - scroll zoom off, no toolbar, click-to-dismiss tooltips
+PLOTLY_CONFIG = {
+    "scrollZoom": False,       # Touch scroll moves page, not zoom on chart
+    "displayModeBar": False,   # Hide floating menu bar on mobile
+    "staticPlot": False,       # Keep tooltips interactive
+}
+
 # === AI НАСТРОЙКИ ===
 # OpenAI модел
 AI_MODEL = "gpt-4o-mini"

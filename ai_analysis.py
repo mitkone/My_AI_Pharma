@@ -322,7 +322,7 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
                 st.plotly_chart(
                     result['figure'],
                     use_container_width=True,
-                    config={'displayModeBar': False}  # Скрива toolbar за mobile
+                    config=config.PLOTLY_CONFIG
                 )
             
             # 3. ГЕНЕРИРАН КОД (Debug)
