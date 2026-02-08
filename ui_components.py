@@ -146,27 +146,40 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
     if not competitor_options:
         competitor_options = [d for d in drugs if d != sel_product]
     
-    # Бутон за автоматично добавяне на Top 3
+    # Top 3: изчисли по избрания Region/Brick, запис в session_state, rerun
     col1, col2 = st.sidebar.columns([3, 1])
     with col1:
         st.markdown("**Добави конкуренти**")
     with col2:
-        add_top3 = st.button("Top 3", help="Добави 3-те най-продавани", key="top3_btn")
+        add_top3 = st.button("Top 3", help="Наш продукт + Top 3 по продажби за избрания регион", key="top3_btn")
     
-    # Ако е натиснат бутона Top 3, избираме автоматично
-    default_competitors = []
+    # Филами данните по избран Region и Brick за Top 3
+    df_filtered_for_top3 = df.copy()
+    if sel_region != "Всички":
+        df_filtered_for_top3 = df_filtered_for_top3[df_filtered_for_top3["Region"] == sel_region]
+    if has_district and sel_district != "Всички":
+        df_filtered_for_top3 = df_filtered_for_top3[df_filtered_for_top3["District"] == sel_district]
+    
     if add_top3:
-        # Вземаме Top 3 (без класове)
-        top3_options = [opt for opt in competitor_options if not opt.startswith("📊 КЛАС:")][:3]
-        default_competitors = top3_options
+        # Top 3 конкуренти по Units за избрания Region/Brick (без наш продукт, без ATC класове)
+        drugs_from_class = [d for d in competitor_drugs]
+        if drugs_from_class:
+            sales_in_region = df_filtered_for_top3[df_filtered_for_top3["Drug_Name"].isin(drugs_from_class)].groupby("Drug_Name")["Units"].sum()
+            top3_drugs = sales_in_region.sort_values(ascending=False).head(3).index.tolist()
+            opt_to_drug = {}
+            for opt in competitor_options:
+                if not opt.startswith("📊 КЛАС:"):
+                    drug_key = opt.split(" (")[0] if " (" in opt else opt
+                    opt_to_drug[drug_key.strip()] = opt
+            top3_options = [opt_to_drug[d] for d in top3_drugs if d in opt_to_drug]
+            st.session_state["sb_competitors"] = top3_options
+            st.rerun()
     
-    # Multiselect за конкуренти
     help_text = "📊 Класове (общи продажби) | Медикаменти сортирани по продажби (най-много → най-малко)"
-    
     competitor_products = st.sidebar.multiselect(
         "Избери конкуренти",
         competitor_options,
-        default=default_competitors,
+        default=[],
         help=help_text,
         key="sb_competitors",
     )
