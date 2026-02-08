@@ -750,7 +750,7 @@ def show_market_share_table(
         ),
         dragmode=False,
         uirevision='constant',
-        height=700,
+        height=800,
         margin=dict(l=10, r=10, t=20, b=20),
     )
     fig.update_traces(

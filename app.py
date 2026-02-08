@@ -348,6 +348,10 @@ if not selected_product_data.empty and len(periods) >= 2:
     # Показваме метриките (Mobile-First: вертикално)
     st.markdown("### 📊 Ключови показатели")
     
+    region_label = filters["region"] if filters["region"] != "Всички" else "Всички региони"
+    brick_label = filters["district"] if filters.get("district") and filters["district"] != "Всички" else "Всички Брикове"
+    st.info(f"📍 **Анализ за:** {region_label} | **Брик:** {brick_label}")
+    
     st.metric(
         label=f"Продажби {last_period}",
         value=f"{int(last_units):,} опак.",
