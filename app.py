@@ -413,7 +413,7 @@ with tab_timeline:
     # Показване на Market Share таблици под графиката
     if df_agg_result is not None:
         # 1. Национален Market Share (винаги)
-        show_market_share_table(df_agg_result, period_col="Quarter", is_national=True)
+        show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
         
         # 2. Регионален Market Share (само ако е избран конкретен регион)
         if filters["region"] != "Всички":
@@ -425,7 +425,7 @@ with tab_timeline:
                 period_col="Quarter"
             )
             if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
-                show_market_share_table(df_regional_share, period_col="Quarter", is_national=False)
+                show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
 
 
 # --- ТАБ 2: ПО BRICK ---

@@ -658,7 +658,8 @@ def calculate_regional_market_share(
 def show_market_share_table(
     df_agg: pd.DataFrame,
     period_col: str = "Quarter",
-    is_national: bool = True
+    is_national: bool = True,
+    key_suffix: str = "national",
 ) -> None:
     """
     Показва stacked bar chart с Market Share по всички тримесечия.
@@ -671,6 +672,8 @@ def show_market_share_table(
         Име на колоната с периоди
     is_national : bool
         Дали е национален (True) или регионален (False) market share
+    key_suffix : str
+        Суфикс за уникален key (за national/regional при едновременно показване)
     """
     import plotly.graph_objects as go
     
@@ -759,11 +762,41 @@ def show_market_share_table(
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
-        height=config.MARKET_SHARE_CHART_HEIGHT,
+        height=config.MARKET_SHARE_CHART_HEIGHT_MOBILE,
         margin=dict(l=50, r=50, t=40, b=80),
     )
     
-    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
+    chart_key = f"market_share_{key_suffix}"
+    dismiss_key = f"ms_dismissed_{key_suffix}"
+    event = st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config=config.PLOTLY_CONFIG,
+        key=chart_key,
+        on_select="rerun",
+        selection_mode="points",
+    )
+    
+    # Панел с информация при натискане на стълб – скрива се при натискане на бутона
+    if event and event.selection and event.selection.points:
+        pts = event.selection.points
+        sel_key = str([(p.get("curve_number", 0), p.get("point_index", 0)) for p in pts])
+        if st.session_state.get(dismiss_key) != sel_key:
+            items = []
+            for p in pts:
+                cnum = p.get("curve_number", 0)
+                period = p.get("x", "—")
+                share = p.get("y", 0)
+                drug = pivot.columns[cnum] if cnum < len(pivot.columns) else "—"
+                items.append(f"**{drug}** – {period}: **{share:.1f}%**")
+            with st.container():
+                st.markdown("---")
+                st.markdown("### 📋 Избрана информация")
+                for it in items:
+                    st.markdown(f"- {it}")
+                if st.button("✕ Затвори", key=f"ms_close_{key_suffix}"):
+                    st.session_state[dismiss_key] = sel_key
+                    st.rerun()
     
     # Различни обяснения
     if is_national:
