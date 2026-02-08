@@ -173,6 +173,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
                     opt_to_drug[drug_key.strip()] = opt
             top3_options = [opt_to_drug[d] for d in top3_drugs if d in opt_to_drug]
             st.session_state["sb_competitors"] = top3_options
+            st.session_state["selected_drugs"] = [sel_product] + top3_drugs
             st.rerun()
     
     help_text = "📊 Класове (общи продажби) | Медикаменти сортирани по продажби (най-много → най-малко)"

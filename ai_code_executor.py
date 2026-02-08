@@ -47,18 +47,21 @@ class CodeExecutionError(Exception):
 
 def safe_exec(
     code: str,
-    master_data_path: Path,
+    master_data_path: Optional[Path] = None,
+    df: Optional[pd.DataFrame] = None,
     timeout: int = 30
 ) -> Dict[str, Any]:
     """
-    Безопасно изпълнява Python код с достъп до master_data.csv.
+    Безопасно изпълнява Python код с достъп до данните.
     
     Параметри
     ---------
     code : str
         Python код за изпълнение
-    master_data_path : Path
-        Път до master_data.csv
+    master_data_path : Path, optional
+        Път до CSV (не се използва ако df е подаден)
+    df : pd.DataFrame, optional
+        DataFrame с данните – приоритет над master_data_path
     timeout : int
         Timeout в секунди (currently not implemented)
     
@@ -103,8 +106,15 @@ def safe_exec(
         }
     }
     
+    if df is not None and not df.empty:
+        exec_df = df.copy()
+    elif master_data_path and Path(master_data_path).exists():
+        exec_df = pd.read_csv(master_data_path)
+    else:
+        exec_df = pd.DataFrame()
     safe_locals = {
-        'master_data_path': str(master_data_path),
+        'master_data_path': str(master_data_path) if master_data_path else '',
+        'df': exec_df,
         'result': None,
         'fig': None,
     }
@@ -175,13 +185,13 @@ def generate_analysis_code(
 Write Python code to analyze the data and answer the question.
 
 **Data Access:**
-- master_data.csv (path in variable `master_data_path`)
-- Columns mapping: Drug_Name (Drug), Region, District (Brick), Quarter (Period), Units (Sales), Source
-- Load: `df = pd.read_csv(master_data_path)`
+- Use the dataframe `df` already loaded in memory – DO NOT use pd.read_csv or master_data_path
+- Column names: Drug_Name (Drug), Region, District (Brick), Quarter (Period), Units (Sales), Source
 - DO NOT use import statements - pd, px, go are ALREADY available
 
 **Calculation Method – STRICT (NEVER estimate):**
-- To find 'most sales' or 'top region': 1) Filter by requested Period (e.g. Quarter == 'Q4 2025'); 2) Group by Region or Drug_Name; 3) Sum Units; 4) Sort descending
+- To find 'most sales' or 'top region': 1) Filter by Period (Quarter == 'Q4 2025'); 2) Group by Region or Drug_Name; 3) Sum Units; 4) Sort by Units descending: .sort_values('Units', ascending=False)
+- ALWAYS sort by Units descending when looking for 'top' anything
 - Always use .sum() for totals – never use a single row value when you need aggregate
 - Growth_Pct: calculate as ((current - previous) / previous * 100) when previous > 0
 
@@ -206,6 +216,25 @@ Write Python code to analyze the data and answer the question.
 Now write ONLY the Python code (no markdown, no explanation):"""
     
     return prompt
+
+
+def get_data_summary_from_df(df: pd.DataFrame) -> Dict[str, Any]:
+    """Резюме на данните от DataFrame (за AI context)."""
+    try:
+        from data_processing import get_period_sort_key
+        periods = []
+        if 'Quarter' in df.columns:
+            periods = sorted(df['Quarter'].unique().tolist(), key=get_period_sort_key)
+        return {
+            'total_rows': len(df),
+            'regions': df['Region'].nunique() if 'Region' in df.columns else 0,
+            'drugs': df['Drug_Name'].nunique() if 'Drug_Name' in df.columns else 0,
+            'periods': periods,
+            'sources': df['Source'].unique().tolist() if 'Source' in df.columns else [],
+        }
+    except Exception as e:
+        logger.error(f"Error getting data summary from df: {e}")
+        return {'error': str(e)}
 
 
 def get_data_summary(master_data_path: Path) -> Dict[str, Any]:

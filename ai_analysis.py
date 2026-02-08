@@ -8,7 +8,6 @@ AI анализ на фармацевтични данни с OpenAI + Code Exec
 """
 
 import os
-import tempfile
 import streamlit as st
 import pandas as pd
 from typing import Optional
@@ -18,6 +17,7 @@ from ai_code_executor import (
     safe_exec,
     generate_analysis_code,
     get_data_summary,
+    get_data_summary_from_df,
     create_mobile_friendly_figure,
     validate_code_safety
 )
@@ -142,7 +142,8 @@ def get_ai_analysis(question: str, data_context: str) -> Optional[str]:
 def execute_ai_code_analysis(
     question: str,
     product_name: str,
-    master_data_path: Path
+    df: pd.DataFrame,
+    master_data_path: Optional[Path] = None
 ) -> dict:
     """
     Изпълнява AI анализ с динамично генериран Python код.
@@ -153,8 +154,10 @@ def execute_ai_code_analysis(
         Въпрос от потребителя
     product_name : str
         Име на продукта
-    master_data_path : Path
-        Път до master_data.csv
+    df : pd.DataFrame
+        DataFrame с данните (използва се директно, не се чете от CSV)
+    master_data_path : Path, optional
+        Път до CSV – не се използва; остава за обратна съвместимост
     
     Връща
     ------
@@ -164,8 +167,8 @@ def execute_ai_code_analysis(
     try:
         from openai import OpenAI
         
-        # Извличане на data summary
-        data_summary = get_data_summary(master_data_path)
+        # Извличане на data summary от DataFrame
+        data_summary = get_data_summary_from_df(df) if df is not None and not df.empty else get_data_summary(master_data_path) if master_data_path else {}
         
         # Генериране на prompt за AI
         prompt = generate_analysis_code(question, product_name, data_summary)
@@ -197,8 +200,8 @@ def execute_ai_code_analysis(
                 'error': f"Code safety check failed: {safety_error}"
             }
         
-        # Изпълнение на кода
-        execution_result = safe_exec(generated_code, master_data_path)
+        # Изпълнение на кода – използваме df от паметта
+        execution_result = safe_exec(generated_code, master_data_path=None, df=df)
         
         # Mobile-optimize фигурата ако има
         if execution_result['figure']:
@@ -236,11 +239,6 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
         "AI използва **същите данни** като dashboard-а (текущите филтри)."
     )
     
-    # Използваме същия DataFrame като dashboard-а: записваме го във временен CSV за AI кода
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8-sig") as tmp:
-        tmp_path = Path(tmp.name)
-    df.to_csv(tmp_path, index=False, encoding="utf-8-sig")
-    
     if df.empty:
         st.warning("Няма данни за текущите филтри. Промени филтрите в sidebar и опитай отново.")
     
@@ -273,17 +271,18 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
             )
             return
         
-        # AI Code Execution Analysis
-        with st.spinner("🤖 AI пише Python код..."):
-            result = execute_ai_code_analysis(
-                question=ai_question,
-                product_name=sel_product,
-                master_data_path=tmp_path
-            )
+        # AI Code Execution Analysis – използва df директно (без CSV)
         try:
-            tmp_path.unlink(missing_ok=True)  # Изтриваме временния CSV
-        except Exception:
-            pass
+            with st.spinner("🤖 AI пише Python код..."):
+                result = execute_ai_code_analysis(
+                    question=ai_question,
+                    product_name=sel_product,
+                    df=df
+                )
+        except Exception as e:
+            st.error("Грешка при AI анализа. Моля, опитай отново.")
+            st.info(f"Детайли: {str(e)}")
+            return
         
         # Показване на резултатите (Mobile-friendly)
         if result['success']:
