@@ -769,37 +769,11 @@ def show_market_share_table(
         margin=dict(l=10, r=10, t=30, b=10),
     )
     
-    chart_key = f"market_share_{key_suffix}"
-    dismiss_key = f"ms_dismissed_{key_suffix}"
-    event = st.plotly_chart(
+    st.plotly_chart(
         fig,
         use_container_width=True,
         config=config.PLOTLY_CONFIG,
-        key=chart_key,
-        on_select="rerun",
-        selection_mode="points",
     )
-    
-    # Панел с информация при натискане на стълб – скрива се при натискане на бутона
-    if event and event.selection and event.selection.points:
-        pts = event.selection.points
-        sel_key = str([(p.get("curve_number", 0), p.get("point_index", 0)) for p in pts])
-        if st.session_state.get(dismiss_key) != sel_key:
-            items = []
-            for p in pts:
-                cnum = p.get("curve_number", 0)
-                share = p.get("x", 0)  # при orientation='h': x=value
-                period = p.get("y", "—")  # при orientation='h': y=category
-                drug = pivot.columns[cnum] if cnum < len(pivot.columns) else "—"
-                items.append(f"**{drug}** – {period}: **{share:.1f}%**")
-            with st.container():
-                st.markdown("---")
-                st.markdown("### 📋 Избрана информация")
-                for it in items:
-                    st.markdown(f"- {it}")
-                if st.button("✕ Затвори", key=f"ms_close_{key_suffix}"):
-                    st.session_state[dismiss_key] = sel_key
-                    st.rerun()
     
     # Различни обяснения
     if is_national:
