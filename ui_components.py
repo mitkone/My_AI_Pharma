@@ -765,12 +765,14 @@ def show_market_share_table(
         dragmode=False,
         clickmode="event+select",
         autosize=False,
-        uirevision='constant',
+        uirevision='always',
         width=600,
         height=800,
-        margin=dict(l=70, r=10, t=30, b=30),
+        minreducedwidth=300,
+        minreducedheight=600,
+        margin=dict(l=10, r=10, t=20, b=20),
     )
-    fig.update_traces(marker_line_width=1.5, opacity=0.9)
+    fig.update_traces(marker_line_width=1.5, opacity=0.9, width=0.8)
     
     st.plotly_chart(
         fig,
