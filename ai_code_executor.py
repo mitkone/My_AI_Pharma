@@ -174,42 +174,34 @@ def generate_analysis_code(
 **Your task:**
 Write Python code to analyze the data and answer the question.
 
-**Available data:**
+**Data Access:**
 - master_data.csv (path in variable `master_data_path`)
-- Columns: Region, Drug_Name, District, Quarter, Units, Source
-- DO NOT use import statements - pd, px, go are ALREADY available in the environment
+- Columns mapping: Drug_Name (Drug), Region, District (Brick), Quarter (Period), Units (Sales), Source
+- Load: `df = pd.read_csv(master_data_path)`
+- DO NOT use import statements - pd, px, go are ALREADY available
 
-**Requirements:**
-1. Load data: `df = pd.read_csv(master_data_path)` – use the variable, not a hardcoded filename
-2. Perform the analysis
-3. Store the answer in variable `result` (string or number)
-4. Create a Plotly chart in variable `fig` (if visualization makes sense)
-5. Use print() for intermediate info (optional)
+**Calculation Method – STRICT (NEVER estimate):**
+- To find 'most sales' or 'top region': 1) Filter by requested Period (e.g. Quarter == 'Q4 2025'); 2) Group by Region or Drug_Name; 3) Sum Units; 4) Sort descending
+- Always use .sum() for totals – never use a single row value when you need aggregate
+- Growth_Pct: calculate as ((current - previous) / previous * 100) when previous > 0
 
-**Example:**
-```python
-# Load data
-df = pd.read_csv(master_data_path)
+**Specific Definitions:**
+- Evolution Index (EI): ((100 + Product_Growth) / (100 + Class_Growth)) * 100
+- Market Share: Sales of a specific drug / total sales of all drugs in that period/region * 100
 
-# Analysis
-product_data = df[df['Drug_Name'] == '{product_name}']
-last_quarter = product_data[product_data['Quarter'] == 'Q4 2025']['Units'].sum()
-prev_quarter = product_data[product_data['Quarter'] == 'Q3 2025']['Units'].sum()
-growth = ((last_quarter - prev_quarter) / prev_quarter * 100) if prev_quarter > 0 else 0
+**Handling Errors:**
+- If the requested period or drug does not exist in the data: set result = 'Липсват данни за този период/продукт. Моля, проверете наличните във филтрите.'
 
-result = f"Growth in Q4 2025: {{growth:.1f}}%"
+**Language:**
+- Always answer in Bulgarian, professional and concise
 
-# Visualization
-quarterly_data = product_data.groupby('Quarter')['Units'].sum().reset_index()
-fig = px.line(quarterly_data, x='Quarter', y='Units', title='{product_name} Sales Trend')
-```
+**Verification:**
+- Before giving a number, double-check: is it the sum of sales (groupby + sum) or a single row value?
 
-**Important:**
-- ALWAYS assign result to `result` variable
-- ALWAYS assign figure to `fig` variable (or set `fig = None` if no chart)
-- Keep code simple and efficient
-- Handle edge cases (empty data, division by zero, etc.)
-- Use Bulgarian for `result` text
+**Output Requirements:**
+- ALWAYS assign result to `result` variable (string)
+- ALWAYS assign figure to `fig` variable (Plotly figure or fig = None)
+- Handle empty data, division by zero
 
 Now write ONLY the Python code (no markdown, no explanation):"""
     
