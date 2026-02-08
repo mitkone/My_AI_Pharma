@@ -7,7 +7,7 @@ EI > 100 означава, че продуктът расте по-бързо о
 
 import streamlit as st
 import pandas as pd
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 
 
 def _is_atc_class(drug_name) -> bool:
@@ -29,71 +29,59 @@ def _is_atc_class(drug_name) -> bool:
     )
 
 
-def _get_prev_year_quarter(quarter: str) -> Optional[str]:
-    """Връща същото тримесечие от предходната година. Напр. Q1 2024 -> Q1 2023."""
-    parts = str(quarter).strip().split()
-    if len(parts) != 2:
-        return None
-    q_part, year_str = parts[0], parts[1]
-    try:
-        year = int(year_str)
-        return f"{q_part} {year - 1}"
-    except ValueError:
-        return None
-
-
 def _calc_evolution_index(
     df: pd.DataFrame,
     drug: str,
-    quarter: str,
+    ref_period: str,
+    base_period: str,
     period_col: str = "Quarter",
-) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[str]]:
+) -> Optional[Dict[str, Any]]:
     """
-    Изчислява EI за даден медикамент и период.
+    Изчислява EI за даден медикамент между два периода.
     
-    Връща: (product_growth_pct, class_growth_pct, ei_value, class_name)
+    Връща dict: sales_ref, sales_base, growth_pct, class_growth_pct, ei, class_name
+    или None ако няма данни.
     """
     if "Source" not in df.columns:
-        return None, None, None, None
+        return None
     
-    prev_quarter = _get_prev_year_quarter(quarter)
-    if not prev_quarter:
-        return None, None, None, None
+    sales_ref = df[(df["Drug_Name"] == drug) & (df[period_col] == ref_period)]["Units"].sum()
+    sales_base = df[(df["Drug_Name"] == drug) & (df[period_col] == base_period)]["Units"].sum()
     
-    # Product units
-    product_current = df[(df["Drug_Name"] == drug) & (df[period_col] == quarter)]["Units"].sum()
-    product_prev = df[(df["Drug_Name"] == drug) & (df[period_col] == prev_quarter)]["Units"].sum()
-    
-    if product_prev == 0:
-        product_growth = 0.0 if product_current == 0 else 100.0
+    if sales_base == 0:
+        growth_pct = 0.0 if sales_ref == 0 else 100.0
     else:
-        product_growth = ((product_current - product_prev) / product_prev) * 100
+        growth_pct = ((sales_ref - sales_base) / sales_base) * 100
     
-    # Therapeutic class (ATC)
     product_source = df[df["Drug_Name"] == drug]["Source"].iloc[0] if len(df[df["Drug_Name"] == drug]) > 0 else None
     if not product_source:
-        return product_growth, None, None, None
+        return {"sales_ref": sales_ref, "sales_base": sales_base, "growth_pct": growth_pct, "class_growth_pct": None, "ei": None, "class_name": None}
     
     df_classes = df[df["Drug_Name"].apply(_is_atc_class)].copy()
     matching_classes = df_classes[df_classes["Source"] == product_source]["Drug_Name"].unique()
     
     if len(matching_classes) == 0:
-        return product_growth, None, None, None
+        return {"sales_ref": sales_ref, "sales_base": sales_base, "growth_pct": growth_pct, "class_growth_pct": None, "ei": None, "class_name": None}
     
     class_name = matching_classes[0]
+    class_ref = df[(df["Drug_Name"] == class_name) & (df[period_col] == ref_period)]["Units"].sum()
+    class_base = df[(df["Drug_Name"] == class_name) & (df[period_col] == base_period)]["Units"].sum()
     
-    class_current = df[(df["Drug_Name"] == class_name) & (df[period_col] == quarter)]["Units"].sum()
-    class_prev = df[(df["Drug_Name"] == class_name) & (df[period_col] == prev_quarter)]["Units"].sum()
-    
-    if class_prev == 0:
-        class_growth = 0.0 if class_current == 0 else 100.0
+    if class_base == 0:
+        class_growth_pct = 0.0 if class_ref == 0 else 100.0
     else:
-        class_growth = ((class_current - class_prev) / class_prev) * 100
+        class_growth_pct = ((class_ref - class_base) / class_base) * 100
     
-    # EI formula
-    ei = ((100 + product_growth) / (100 + class_growth)) * 100
+    ei = ((100 + growth_pct) / (100 + class_growth_pct)) * 100
     
-    return product_growth, class_growth, ei, class_name
+    return {
+        "sales_ref": sales_ref,
+        "sales_base": sales_base,
+        "growth_pct": growth_pct,
+        "class_growth_pct": class_growth_pct,
+        "ei": ei,
+        "class_name": class_name,
+    }
 
 
 def render_evolution_index_tab(df: pd.DataFrame, periods: list, period_col: str = "Quarter") -> None:
@@ -111,7 +99,6 @@ def render_evolution_index_tab(df: pd.DataFrame, periods: list, period_col: str 
     """
     st.subheader("📊 Еволюционен Индекс")
     
-    # Само медикаменти (без ATC класове) за избор
     drugs_for_select = sorted(
         df[~df["Drug_Name"].apply(_is_atc_class)]["Drug_Name"].unique()
     )
@@ -124,37 +111,99 @@ def render_evolution_index_tab(df: pd.DataFrame, periods: list, period_col: str 
         st.warning("Няма налични периоди за анализ.")
         return
     
+    # Multi-select за портфолио
+    sel_drugs = st.multiselect(
+        "Избери медикаменти (портфолио)",
+        drugs_for_select,
+        default=[drugs_for_select[0]] if drugs_for_select else [],
+        key="ei_drugs",
+    )
+    
     col1, col2 = st.columns(2)
     with col1:
-        sel_drug = st.selectbox("Избери медикамент", drugs_for_select, key="ei_drug")
+        ref_idx = len(periods) - 1
+        ref_period = st.selectbox("Референтен период", periods, index=ref_idx, key="ei_ref")
     with col2:
-        sel_period = st.selectbox("Избери тримесечие", periods, index=len(periods) - 1, key="ei_period")
+        base_idx = len(periods) - 2 if len(periods) >= 2 else 0
+        base_period = st.selectbox("Базов период", periods, index=base_idx, key="ei_base")
     
-    product_growth, class_growth, ei_value, class_name = _calc_evolution_index(df, sel_drug, sel_period, period_col)
-    
-    if ei_value is None:
-        st.info("Не е наличен терапевтичен клас за избрания медикамент, или липсват данни за сравнението.")
+    if ref_period == base_period:
+        st.warning("Референтният и базовият период трябва да са различни.")
         return
     
-    # Голяма метрика – центрирана
+    if not sel_drugs:
+        st.info("Избери поне един медикамент.")
+        return
+    
+    # Изчисляване за всеки лекарствен продукт
+    rows: List[Dict[str, Any]] = []
+    total_sales_ref = 0.0
+    weighted_ei_sum = 0.0
+    
+    for drug in sel_drugs:
+        result = _calc_evolution_index(df, drug, ref_period, base_period, period_col)
+        if result and result["ei"] is not None:
+            rows.append({
+                "drug": drug,
+                "sales_ref": result["sales_ref"],
+                "sales_base": result["sales_base"],
+                "growth_pct": result["growth_pct"],
+                "class_growth_pct": result["class_growth_pct"],
+                "ei": result["ei"],
+            })
+            total_sales_ref += result["sales_ref"]
+            weighted_ei_sum += result["ei"] * result["sales_ref"]
+        else:
+            rows.append({
+                "drug": drug,
+                "sales_ref": result["sales_ref"] if result else 0,
+                "sales_base": result["sales_base"] if result else 0,
+                "growth_pct": result["growth_pct"] if result else None,
+                "class_growth_pct": result["class_growth_pct"] if result else None,
+                "ei": None,
+            })
+    
+    # Общ EI – претеглена средна по продажби (референтен период)
+    overall_ei = (weighted_ei_sum / total_sales_ref) if total_sales_ref > 0 else None
+    
+    # Голяма метрика – Общ Еволюционен Индекс на избора
     st.markdown("---")
-    st.markdown(f"### Еволюционен Индекс за **{sel_drug}**")
-    st.metric(
-        label=sel_period,
-        value=f"{ei_value:.1f}",
-        delta=None,
-    )
+    st.markdown("### Общ Еволюционен Индекс на избора")
+    if overall_ei is not None:
+        st.metric(label=f"{ref_period} vs {base_period}", value=f"{overall_ei:.1f}", delta=None)
+    else:
+        st.metric(label=f"{ref_period} vs {base_period}", value="—", delta=None)
     st.caption("EI > 100 означава, че продуктът расте по-бързо от пазарния сегмент.")
     
-    # Сравнителна таблица
+    # Таблица: Drug Name | Sales (Ref) | Sales (Base) | Growth % | Class Growth % | EI
     st.markdown("---")
-    st.markdown("**Сравнение**")
-    comparison_data = {
-        "Показател": ["% Ръст на продукта", "% Ръст на класа (пазара)", "EI стойност"],
-        "Стойност": [
-            f"{product_growth:+.1f}%",
-            f"{class_growth:+.1f}%",
-            f"{ei_value:.1f}",
-        ],
+    st.markdown("**Резултати по медикамент**")
+    
+    table_data = []
+    for r in rows:
+        table_data.append({
+            "Медикамент": r["drug"],
+            "Продажби (Ref)": f"{int(r['sales_ref']):,}",
+            "Продажби (Base)": f"{int(r['sales_base']):,}",
+            "Ръст %": f"{r['growth_pct']:+.1f}%" if r["growth_pct"] is not None else "—",
+            "Ръст клас %": f"{r['class_growth_pct']:+.1f}%" if r["class_growth_pct"] is not None else "—",
+            "EI": f"{r['ei']:.1f}" if r["ei"] is not None else "—",
+        })
+    
+    df_table = pd.DataFrame(table_data)
+    
+    # TOTAL ред
+    total_sales_base = sum(r["sales_base"] for r in rows)
+    total_growth = ((total_sales_ref - total_sales_base) / total_sales_base * 100) if total_sales_base > 0 else 0
+    # За класа – използваме среднопретегления class growth или просто overall EI
+    total_row = {
+        "Медикамент": "**TOTAL**",
+        "Продажби (Ref)": f"{int(total_sales_ref):,}",
+        "Продажби (Base)": f"{int(total_sales_base):,}",
+        "Ръст %": f"{total_growth:+.1f}%",
+        "Ръст клас %": "—",
+        "EI": f"{overall_ei:.1f}" if overall_ei is not None else "—",
     }
-    st.table(pd.DataFrame(comparison_data))
+    df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
+    
+    st.dataframe(df_table, use_container_width=True, hide_index=True)
