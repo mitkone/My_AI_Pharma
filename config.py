@@ -52,7 +52,7 @@ METRICS = ["Units (опак.)"]
 CHART_HEIGHT = 500
 BRICK_CHART_HEIGHT = 500
 MARKET_SHARE_CHART_HEIGHT = 650  # По-голяма за по-четливи tooltips и autoscale
-MARKET_SHARE_CHART_HEIGHT_MOBILE = 800  # Още по-голяма на мобилни – винаги увеличена
+MARKET_SHARE_CHART_HEIGHT_MOBILE = 500  # Фиксирана височина – не се смачква при много конкуренти
 TIMELINE_CHART_HEIGHT = 500
 COMPARISON_CHART_HEIGHT = 500
 

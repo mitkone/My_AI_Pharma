@@ -699,7 +699,11 @@ def show_market_share_table(
     # Хронологично сортиране на периодите
     from data_processing import get_period_sort_key
     sorted_periods = sorted(pivot.index.tolist(), key=get_period_sort_key)
-    pivot = pivot.reindex(sorted_periods)  # Пренареждаме редовете
+    pivot = pivot.reindex(sorted_periods)
+    
+    # Сортиране на продукти по пазарен дял (лидерът отгоре в стека)
+    drug_order = pivot.sum().sort_values(ascending=True).index.tolist()
+    pivot = pivot[drug_order]
     
     # Цветова палитра
     colors = [
@@ -707,63 +711,62 @@ def show_market_share_table(
         '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
     ]
     
-    # Stacked bar chart - всички тримесечия
+    # Horizontal stacked bar chart – по-четливо на мобилни
     fig = go.Figure()
     for i, drug in enumerate(pivot.columns):
         fig.add_trace(go.Bar(
-            x=pivot.index,
-            y=pivot[drug],
+            x=pivot[drug],
+            y=pivot.index,
             name=drug,
+            orientation='h',
             marker_color=colors[i % len(colors)],
             text=pivot[drug].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x >= 2 else ""),
             textposition='inside',
             textfont=dict(color='white', size=11, family='Arial Black'),
+            insidetextanchor='middle',
             hovertemplate='<b>%{fullData.name}</b><br>' +
-                         '<b>%{x}</b><br>' +
-                         'Market Share: <b>%{y:.2f}%</b><extra></extra>'
+                         '<b>%{y}</b><br>' +
+                         'Market Share: <b>%{x:.2f}%</b><extra></extra>'
         ))
     
-    # Layout - увеличена графика, autoscale, по-четливи tooltips
+    # Layout – mobile-optimized: horizontal bars, фиксирана височина, минимални margins
     fig.update_layout(
         barmode='stack',
-        autosize=True,
-        xaxis_title=period_col,
+        xaxis_title='Market Share (%)',
         xaxis=dict(
-            categoryorder='array',
-            categoryarray=sorted_periods,
-            title_font=dict(size=15),
-            tickfont=dict(size=14),
-            autorange=True,
-        ),
-        yaxis_title='Market Share (%)',
-        yaxis=dict(
             range=[0, 100],
-            title_font=dict(size=15),
-            tickfont=dict(size=14),
+            title_font=dict(size=14),
+            tickfont=dict(size=12),
             autorange=False,
         ),
+        yaxis_title=period_col,
+        yaxis=dict(
+            categoryorder='array',
+            categoryarray=sorted_periods,
+            title_font=dict(size=14),
+            tickfont=dict(size=12),
+            autorange='reversed',  # Q1 най-горе
+        ),
+        showlegend=True,
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.5,
+            y=-0.35,
             xanchor="center",
             x=0.5,
-            bgcolor="rgba(255, 255, 255, 0.95)",
-            bordercolor="rgba(0, 0, 0, 0.2)",
-            borderwidth=1,
-            font=dict(size=12, family="Arial", color="black")
+            font=dict(size=11),
         ),
-        hovermode='x unified',
+        hovermode='y unified',
         hoverlabel=dict(
             bgcolor="white",
             bordercolor="#333",
-            font=dict(size=16, family="Arial", color="#1a1a1a"),
+            font=dict(size=14, family="Arial", color="#1a1a1a"),
         ),
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
         height=config.MARKET_SHARE_CHART_HEIGHT_MOBILE,
-        margin=dict(l=50, r=50, t=40, b=80),
+        margin=dict(l=10, r=10, t=30, b=10),
     )
     
     chart_key = f"market_share_{key_suffix}"
@@ -785,8 +788,8 @@ def show_market_share_table(
             items = []
             for p in pts:
                 cnum = p.get("curve_number", 0)
-                period = p.get("x", "—")
-                share = p.get("y", 0)
+                share = p.get("x", 0)  # при orientation='h': x=value
+                period = p.get("y", "—")  # при orientation='h': y=category
                 drug = pivot.columns[cnum] if cnum < len(pivot.columns) else "—"
                 items.append(f"**{drug}** – {period}: **{share:.1f}%**")
             with st.container():
