@@ -723,29 +723,21 @@ def show_market_share_table(
             text=pivot[drug].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x >= 0.5 else ""),
             textposition='inside',
             textfont=dict(color='white', size=11, family='Arial'),
-            hovertemplate='<b>%{fullData.name}</b><br>' +
-                         '<b>%{y}</b><br>' +
-                         'Market Share: <b>%{x:.2f}%</b><extra></extra>'
         ))
     
-    # Layout – фиксирани размери, дебели барове, locked scale
+    # Layout – auto-scale on load, дебели барове
     fig.update_layout(
         barmode='stack',
         bargap=0.1,
         xaxis_title='Market Share (%)',
-        xaxis=dict(
-            range=[0, 100],
-            title_font=dict(size=14),
-            tickfont=dict(size=12),
-            autorange=False,
-        ),
+        xaxis=dict(autorange=True, title_font=dict(size=14), tickfont=dict(size=12)),
         yaxis_title=period_col,
         yaxis=dict(
             categoryorder='array',
             categoryarray=sorted_periods,
+            autorange=True,
             title_font=dict(size=14),
             tickfont=dict(size=12),
-            autorange='reversed',
         ),
         showlegend=True,
         legend=dict(
@@ -756,28 +748,25 @@ def show_market_share_table(
             x=0.5,
             font=dict(size=11),
         ),
-        hovermode='y unified',
-        hoverlabel=dict(
-            bgcolor="white",
-            bordercolor="#333",
-            font=dict(size=14, family="Arial", color="#1a1a1a"),
-        ),
         dragmode=False,
-        clickmode="event+select",
-        autosize=False,
-        uirevision='always',
-        width=600,
-        height=800,
-        minreducedwidth=300,
-        minreducedheight=600,
+        uirevision='constant',
+        height=700,
         margin=dict(l=10, r=10, t=20, b=20),
     )
-    fig.update_traces(marker_line_width=1.5, opacity=0.9, width=0.8)
+    fig.update_traces(
+        marker_line_width=1.5,
+        opacity=0.9,
+        width=0.8,
+        hoverinfo='none',
+        hovertemplate=None,
+        selectedpoints=None,
+        unselected=dict(marker=dict(opacity=1)),
+    )
     
     st.plotly_chart(
         fig,
         use_container_width=True,
-        config={'displayModeBar': False, 'scrollZoom': False, 'responsive': False, 'doubleClick': False},
+        config={'doubleClick': 'reset', 'displayModeBar': False},
     )
     
     # Различни обяснения
