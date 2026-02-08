@@ -535,11 +535,13 @@ def create_timeline_chart(
     )
     
     fig.update_layout(
-        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
+        height=config.MOBILE_CHART_HEIGHT,
         legend_title="",
         showlegend=True,
-        hovermode="closest",  # Click/tap elsewhere to dismiss tooltip
-        dragmode=False,       # Prevent accidental panning on mobile
+        hovermode="closest",
+        dragmode=False,
+        clickmode="event+select",
+        uirevision="constant",
         xaxis_tickangle=-45,
         xaxis=dict(
             categoryorder="array",
@@ -749,8 +751,10 @@ def show_market_share_table(
         ),
         hovermode='closest',
         dragmode=False,
+        clickmode="event+select",
+        uirevision="constant",
         height=config.MOBILE_CHART_HEIGHT,
-        margin=dict(l=0, r=0, t=30, b=0)
+        margin=dict(l=0, r=0, t=30, b=0),
     )
     
     st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
@@ -891,6 +895,8 @@ def create_brick_charts(
         ),
         hovermode='closest',
         dragmode=False,
+        clickmode="event+select",
+        uirevision="constant",
         margin=dict(l=0, r=0, t=30, b=0),
         font=dict(size=12),
     )
@@ -944,6 +950,8 @@ def create_brick_charts(
         ),
         hovermode='closest',
         dragmode=False,
+        clickmode="event+select",
+        uirevision="constant",
         margin=dict(l=0, r=0, t=30, b=0),
         font=dict(size=12),
     )

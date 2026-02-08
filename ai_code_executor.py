@@ -263,6 +263,8 @@ def create_mobile_friendly_figure(fig: go.Figure) -> go.Figure:
         font=dict(size=12),
         hovermode='closest',
         dragmode=False,
+        clickmode="event+select",
+        uirevision="constant",
         legend=dict(
             orientation="h",
             yanchor="bottom",

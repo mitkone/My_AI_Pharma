@@ -244,6 +244,41 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
     if df.empty:
         st.warning("Няма данни за текущите филтри. Промени филтрите в sidebar и опитай отново.")
     
+    # ===== AUTO-RUN: заявка от Quick Search "Ask AI Analyst about this drug" =====
+    pending = st.session_state.get("ai_pending_question")
+    auto_run = st.session_state.get("ai_auto_run", False)
+    if pending and auto_run and check_api_key():
+        st.session_state.pop("ai_pending_question", None)
+        st.session_state.pop("ai_auto_run", None)
+        with st.spinner("🤖 AI анализира (от Quick Search)..."):
+            result = execute_ai_code_analysis(
+                question=pending,
+                product_name=sel_product,
+                master_data_path=tmp_path,
+            )
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        if result["success"]:
+            st.success("✅ Анализът завърши успешно!")
+            st.markdown("### 📊 Отговор:")
+            if result.get("result"):
+                st.markdown(f"**{result['result']}**")
+            if result.get("output"):
+                with st.expander("📝 Детайли от анализа"):
+                    st.text(result["output"])
+            if result.get("figure"):
+                st.markdown("### 📈 Визуализация:")
+                st.plotly_chart(
+                    result["figure"],
+                    use_container_width=True,
+                    config=config.PLOTLY_CONFIG,
+                )
+        else:
+            st.error(f"Грешка при анализа: {result.get('error', 'Unknown')}")
+        st.divider()
+    
     # ===== SUGGESTED QUESTIONS (БУТОНИ) =====
     st.markdown("### 💡 Бързи въпроси")
     st.caption("Кликни на бутон за автоматично попълване:")

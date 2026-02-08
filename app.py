@@ -181,74 +181,70 @@ if is_admin:
     st.sidebar.divider()
 
 # ============================================================================
-# QUICK SEARCH / ASK AI (ПРЕДИ филтрите - Mobile-First: Top priority)
+# QUICK SEARCH / ASK AI (autocomplete от Drug колоната)
 # ============================================================================
 
+import re
+def _is_atc_class(drug_name):
+    if pd.isna(drug_name):
+        return False
+    return bool(re.match(r'^[A-Z]\d{2}[A-Z]\d', str(drug_name).strip()))
+
+# Уникални медикаменти от данните (без ATC класове)
+_all_drugs = sorted([
+    d for d in df_raw["Drug_Name"].dropna().unique()
+    if not _is_atc_class(d)
+])
+
 st.markdown("### 🔍 Quick Search / Ask AI")
-quick_search = st.text_input(
-    "Търси медикамент",
-    placeholder="напр. 'Lipocante', 'Fenofibrate' (работи дори с typo-s)",
-    help="Въведи име на медикамент или молекула. AI ще намери резултати дори при грешки в изписването.",
-    key="quick_search_input",
-    label_visibility="collapsed"
+drug_filter = st.text_input(
+    "Start typing drug name (e.g., Lip...)",
+    placeholder="e.g., Lip...",
+    key="drug_search_filter",
+    help="Филтрирай и избери медикамент от списъка.",
+)
+# Динамичен списък: филтрирани по въведен текст
+_filter = (drug_filter or "").strip().lower()
+filtered_drugs = [d for d in _all_drugs if _filter in (d or "").lower()]
+if not filtered_drugs:
+    filtered_drugs = _all_drugs  # ако няма съвпадение, показваме всички
+
+# Selectbox с предложения от данните
+selected_drug = st.selectbox(
+    "Избери медикамент",
+    options=[""] + filtered_drugs,
+    format_func=lambda x: x if x else "— Select a drug —",
+    key="quick_search_select",
+    label_visibility="collapsed",
 )
 
-# Обработка на Quick Search query
-quick_search_result = None
-if quick_search:
-    from difflib import get_close_matches
-    import re
-    
-    # Функция за разпознаване на ATC класове
-    def is_atc_class(drug_name):
-        if pd.isna(drug_name):
-            return False
-        name_str = str(drug_name).strip()
-        return bool(re.match(r'^[A-Z]\d{2}[A-Z]\d', name_str))
-    
-    # Вземаме всички уникални Drug_Name (без ATC класове)
-    all_drugs = [d for d in df_raw["Drug_Name"].dropna().unique() if not is_atc_class(d)]
-    
-    # Fuzzy matching за търсенето (tolerance за typos)
-    matches = get_close_matches(quick_search.upper(), [d.upper() for d in all_drugs], n=3, cutoff=0.6)
-    
-    if matches:
-        # Намираме оригиналното име (с правилен case)
-        matched_drug = next(d for d in all_drugs if d.upper() == matches[0])
-        quick_search_result = matched_drug
-        
-        # Запазваме в session_state за да филтрираме автоматично
-        st.session_state['quick_search_drug'] = matched_drug
-        
-        # Показваме резултата
-        st.success(f"✅ Намерен: **{matched_drug}**")
-        
-        # Генерираме 2-line summary
-        periods_temp = get_sorted_periods(df_raw)
-        drug_data = df_raw[df_raw["Drug_Name"] == matched_drug].copy()
-        
-        if not drug_data.empty and len(periods_temp) >= 2:
-            last_period = periods_temp[-1]
-            prev_period = periods_temp[-2]
-            
-            last_units = drug_data[drug_data["Quarter"] == last_period]["Units"].sum()
-            prev_units = drug_data[drug_data["Quarter"] == prev_period]["Units"].sum()
-            growth_pct = ((last_units - prev_units) / prev_units * 100) if prev_units > 0 else 0
-            
-            # Брой активни региони
-            regions_count = drug_data[drug_data["Quarter"] == last_period]["Region"].nunique()
-            
-            # 2-line summary
-            growth_emoji = "📈" if growth_pct > 0 else "📉"
-            st.info(
-                f"{growth_emoji} **Продажби {last_period}**: {int(last_units):,} опак. ({growth_pct:+.1f}% vs {prev_period})  \n"
-                f"🗺️ **Региони**: {regions_count} | **Общо периоди**: {len(drug_data['Quarter'].unique())}"
-            )
-    else:
-        st.warning(f"❌ Не намерих медикамент със сходно име на '{quick_search}'. Опитай друго име.")
-        # Clear previous search
-        if 'quick_search_drug' in st.session_state:
-            del st.session_state['quick_search_drug']
+if selected_drug:
+    st.session_state["quick_search_drug"] = selected_drug
+    st.success(f"✅ Избран: **{selected_drug}**")
+    periods_temp = get_sorted_periods(df_raw)
+    drug_data = df_raw[df_raw["Drug_Name"] == selected_drug].copy()
+    if not drug_data.empty and len(periods_temp) >= 2:
+        last_period = periods_temp[-1]
+        prev_period = periods_temp[-2]
+        last_units = drug_data[drug_data["Quarter"] == last_period]["Units"].sum()
+        prev_units = drug_data[drug_data["Quarter"] == prev_period]["Units"].sum()
+        growth_pct = ((last_units - prev_units) / prev_units * 100) if prev_units > 0 else 0
+        regions_count = drug_data[drug_data["Quarter"] == last_period]["Region"].nunique()
+        growth_emoji = "📈" if growth_pct > 0 else "📉"
+        st.info(
+            f"{growth_emoji} **Продажби {last_period}**: {int(last_units):,} опак. ({growth_pct:+.1f}% vs {prev_period})  \n"
+            f"🗺️ **Региони**: {regions_count} | **Общо периоди**: {len(drug_data['Quarter'].unique())}"
+        )
+    # Бутон: Ask AI Analyst about this drug
+    if st.button("🤖 Ask AI Analyst about this drug", type="primary", use_container_width=True, key="ask_ai_btn"):
+        st.session_state["ai_pending_question"] = (
+            f"Analyze the sales trend and market share for {selected_drug}."
+        )
+        st.session_state["ai_auto_run"] = True
+        st.info("👉 Open the **AI Analyst** tab to see the analysis (it will run automatically).")
+else:
+    if "quick_search_drug" in st.session_state:
+        del st.session_state["quick_search_drug"]
 
 st.markdown("---")
 
