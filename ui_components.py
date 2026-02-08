@@ -749,7 +749,8 @@ def show_market_share_table(
             borderwidth=1,
             font=dict(size=12, family="Arial", color="black")
         ),
-        hovermode='closest',
+        hovermode='x unified',
+        hoverlabel=dict(bgcolor="white", font_size=14),
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
@@ -901,58 +902,3 @@ def create_brick_charts(
         font=dict(size=12),
     )
     st.plotly_chart(fig_geo, use_container_width=True, config=config.PLOTLY_CONFIG)
-    
-    # Stacked bar chart за дял
-    total_by_x = df_geo.groupby(group_col)["Units"].sum()
-    
-    def calc_geo_share(row):
-        total = total_by_x.get(row[group_col], 0)
-        return 100 * row["Units"] / total if total > 0 else 0
-    
-    df_geo_agg["Share"] = df_geo_agg.apply(calc_geo_share, axis=1)
-    
-    fig_share = px.bar(
-        df_geo_agg,
-        x=group_col,
-        y="Share",
-        color="Drug_Name",
-        barmode="stack",
-        title=f"Дял (%) по {x_label}",
-    )
-    
-    # Почистен hover template
-    fig_share.update_traces(
-        hovertemplate="<b>%{fullData.name}</b><br>%{x}<br>%{y:.1f}%<extra></extra>"
-    )
-    
-    fig_share.update_layout(
-        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
-        legend_title="",
-        xaxis_tickangle=-45,
-        xaxis=dict(
-            title="",
-            title_font=dict(size=14),
-            tickfont=dict(size=14),
-            autorange=True,
-        ),
-        yaxis=dict(
-            title="Дял (%)",
-            title_font=dict(size=14),
-            tickfont=dict(size=14),
-            autorange=True,
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.5,
-            xanchor="center",
-            x=0.5
-        ),
-        hovermode='closest',
-        dragmode=False,
-        clickmode="event+select",
-        uirevision="constant",
-        margin=dict(l=0, r=0, t=30, b=0),
-        font=dict(size=12),
-    )
-    st.plotly_chart(fig_share, use_container_width=True, config=config.PLOTLY_CONFIG)
