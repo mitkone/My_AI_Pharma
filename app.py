@@ -43,6 +43,22 @@ from ai_analysis import render_ai_analysis_tab
 from comparison_tools import create_period_comparison, create_regional_comparison
 
 
+@st.fragment
+def _render_market_share_section(df_agg_result, df_filtered, filters, products_on_chart, periods):
+    """Market Share секция – fragment за частично rerun при клик (не презарежда цялото приложение)."""
+    show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
+    if filters["region"] != "Всички":
+        st.markdown("---")
+        df_regional_share = calculate_regional_market_share(
+            df=df_filtered,
+            products_list=products_on_chart,
+            periods=periods,
+            period_col="Quarter"
+        )
+        if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
+            show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
+
+
 # ============================================================================
 # КЕШИРАНЕ НА ДАННИ
 # ============================================================================
@@ -410,22 +426,15 @@ with tab_timeline:
         competitors=filters["competitors"],
     )
     
-    # Показване на Market Share таблици под графиката
+    # Market Share – в fragment: при клик се презарежда само тази секция, не цялото приложение
     if df_agg_result is not None:
-        # 1. Национален Market Share (винаги)
-        show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
-        
-        # 2. Регионален Market Share (само ако е избран конкретен регион)
-        if filters["region"] != "Всички":
-            st.markdown("---")
-            df_regional_share = calculate_regional_market_share(
-                df=df_filtered,
-                products_list=products_on_chart,
-                periods=periods,
-                period_col="Quarter"
-            )
-            if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
-                show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
+        _render_market_share_section(
+            df_agg_result=df_agg_result,
+            df_filtered=df_filtered,
+            filters=filters,
+            products_on_chart=products_on_chart,
+            periods=periods,
+        )
 
 
 # --- ТАБ 2: ПО BRICK ---
