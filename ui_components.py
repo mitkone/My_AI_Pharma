@@ -728,11 +728,10 @@ def show_market_share_table(
                          'Market Share: <b>%{x:.2f}%</b><extra></extra>'
         ))
     
-    # Layout – винаги широка лента, проценти вътре (без отрязване), достатъчно височина
+    # Layout – фиксирани размери, без преоразмеряване при tap
     fig.update_layout(
         barmode='stack',
-        bargap=0.15,
-        bargroupgap=0.02,
+        bargap=0.2,
         xaxis_title='Market Share (%)',
         xaxis=dict(
             range=[0, 100],
@@ -765,17 +764,18 @@ def show_market_share_table(
         ),
         dragmode=False,
         clickmode="event+select",
-        uirevision="constant",
-        height=max(700, 80 * len(sorted_periods)),
-        margin=dict(l=10, r=15, t=30, b=10),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
+        autosize=False,
+        uirevision='constant',
+        height=800,
+        margin=dict(l=50, r=20, t=50, b=50),
     )
+    fig.update_traces(marker_line_width=1.5, opacity=0.9)
     
+    _ms_config = {'staticPlot': False, 'scrollZoom': False, 'doubleClick': 'reset'}
     st.plotly_chart(
         fig,
         use_container_width=True,
-        config=config.PLOTLY_CONFIG,
+        config={**config.PLOTLY_CONFIG, **_ms_config},
     )
     
     # Различни обяснения
