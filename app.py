@@ -41,6 +41,7 @@ from ui_components import (
 )
 from ai_analysis import render_ai_analysis_tab
 from comparison_tools import create_period_comparison, create_regional_comparison
+from evolution_index import render_evolution_index_tab
 
 
 # ============================================================================
@@ -385,11 +386,12 @@ if not selected_product_data.empty and len(periods) >= 2:
 # ТАБОВЕ - ДИНАМИЧНИ СПОРЕД РОЛЯ
 # ============================================================================
 
-# Табове – всички потребители виждат Dashboard, Brick, Сравнение и AI Analyst
-tab_timeline, tab_brick, tab_comparison, tab_ai = st.tabs([
+# Табове – всички потребители виждат Dashboard, Brick, Сравнение, EI и AI Analyst
+tab_timeline, tab_brick, tab_comparison, tab_ei, tab_ai = st.tabs([
     "📈 Dashboard",
     "🗺️ По Brick (райони)",
     "⚖️ Сравнение",
+    "📊 Еволюционен Индекс",
     "🤖 AI Analyst"
 ])
 
@@ -460,7 +462,12 @@ with tab_comparison:
         )
 
 
-# --- ТАБ 4: AI ANALYST ---
+# --- ТАБ 4: ЕВОЛЮЦИОНЕН ИНДЕКС ---
+with tab_ei:
+    render_evolution_index_tab(df=df_filtered, periods=periods, period_col="Quarter")
+
+
+# --- ТАБ 5: AI ANALYST ---
 with tab_ai:
     render_ai_analysis_tab(
         df=df_filtered,
