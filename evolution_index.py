@@ -234,14 +234,14 @@ def render_evolution_index_tab(
         if w_sum > 0:
             region_ei_data.append((region, ei_weighted / w_sum))
     
-    region_ei_data.sort(key=lambda x: x[1], reverse=True)  # Сортиране по EI descending (най-висок отгоре)
+    region_ei_data.sort(key=lambda x: x[1], reverse=True)  # highest EI first
+    labels = [r[0] for r in region_ei_data]
+    values = [r[1] for r in region_ei_data]
     
     if region_ei_data:
         st.markdown("---")
         st.markdown("### 📊 EI по регион (бенчмарк)")
         
-        labels = [r[0] for r in region_ei_data]
-        values = [r[1] for r in region_ei_data]
         colors = ["#2ecc71" if v >= 100 else "#e74c3c" for v in values]
         
         fig = go.Figure()
@@ -262,7 +262,7 @@ def render_evolution_index_tab(
             margin=dict(l=80, r=60, t=20, b=40),
             showlegend=False,
             xaxis=dict(zeroline=True, zerolinewidth=1),
-            yaxis=dict(tickfont=dict(size=12)),
+            yaxis=dict(tickfont=dict(size=12), categoryorder='total ascending'),
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
         st.caption("Графиката показва сравнително представяне на избраното портфолио по региони за избраните периоди.")
