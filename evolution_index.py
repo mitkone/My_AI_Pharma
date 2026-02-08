@@ -7,6 +7,7 @@ EI > 100 означава, че продуктът расте по-бързо о
 
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
 from typing import Optional, Tuple, List, Dict, Any
 
 
@@ -217,6 +218,61 @@ def render_evolution_index_tab(
         "EI > 100 означава, че продуктът расте по-бързо от пазарния сегмент. "
         f"Претеглено по продажби в {location_label} (референтен период)."
     )
+    
+    # Regional Benchmark Chart – EI по регион/брик за избраното портфолио
+    if "District" in df_national.columns:
+        locs = df_national.groupby(["Region", "District"]).size().reset_index()[["Region", "District"]]
+        locs = locs.sort_values(["Region", "District"])
+        loc_labels = [f"{r} | {d}" for r, d in zip(locs["Region"], locs["District"])]
+        loc_filters = [(locs["Region"].iloc[i], locs["District"].iloc[i]) for i in range(len(locs))]
+    else:
+        loc_labels = sorted(df_national["Region"].unique())
+        loc_filters = [(r, None) for r in loc_labels]
+    
+    region_ei_data: List[Tuple[str, float]] = []
+    for i, (region, district) in enumerate(loc_filters):
+        df_loc = df_national[df_national["Region"] == region]
+        if district is not None:
+            df_loc = df_loc[df_loc["District"] == district]
+        w_sum = 0.0
+        ei_weighted = 0.0
+        for drug in sel_drugs:
+            res = _calc_evolution_index(df_loc, drug, ref_period, base_period, period_col)
+            if res and res["ei"] is not None and res["sales_ref"] > 0:
+                ei_weighted += res["ei"] * res["sales_ref"]
+                w_sum += res["sales_ref"]
+        if w_sum > 0:
+            region_ei_data.append((loc_labels[i], ei_weighted / w_sum))
+    
+    if region_ei_data:
+        st.markdown("---")
+        st.markdown("### 📊 EI по регион/брик (бенчмарк)")
+        st.caption("Изпълнение на избраното портфолио във всеки регион. Вертикалната червена линия е EI = 100.")
+        
+        labels = [r[0] for r in region_ei_data]
+        values = [r[1] for r in region_ei_data]
+        colors = ["#2ecc71" if v >= 100 else "#e74c3c" for v in values]
+        
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=values,
+            y=labels,
+            orientation='h',
+            marker_color=colors,
+            text=[f"{v:.1f}" for v in values],
+            textposition='outside',
+            textfont=dict(size=11),
+        ))
+        fig.add_vline(x=100, line_dash="dash", line_color="red", line_width=2)
+        fig.update_layout(
+            xaxis_title="Еволюционен Индекс (EI)",
+            yaxis_title="Регион / Брик",
+            height=800,
+            margin=dict(l=10, r=60, t=20, b=40),
+            showlegend=False,
+            xaxis=dict(zeroline=True, zerolinewidth=1),
+        )
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
     
     # Таблица: Drug Name | Sales (Ref) | Sales (Base) | Growth % | Class Growth % | EI
     st.markdown("---")
