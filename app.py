@@ -464,7 +464,13 @@ with tab_comparison:
 
 # --- ТАБ 4: ЕВОЛЮЦИОНЕН ИНДЕКС ---
 with tab_ei:
-    render_evolution_index_tab(df=df_filtered, periods=periods, period_col="Quarter")
+    render_evolution_index_tab(
+        df_filtered=df_filtered,
+        df_national=df_raw,
+        periods=periods,
+        filters=filters,
+        period_col="Quarter",
+    )
 
 
 # --- ТАБ 5: AI ANALYST ---

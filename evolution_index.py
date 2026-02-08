@@ -84,20 +84,59 @@ def _calc_evolution_index(
     }
 
 
-def render_evolution_index_tab(df: pd.DataFrame, periods: list, period_col: str = "Quarter") -> None:
+def _get_location_label(filters: dict) -> str:
+    """Формира етикет за локация от филтрите."""
+    if not filters:
+        return "Всички региони"
+    region = filters.get("region", "Всички")
+    district = filters.get("district", "Всички")
+    has_district = filters.get("has_district", False)
+    if region == "Всички" and (not has_district or district == "Всички"):
+        return "Всички региони"
+    parts = []
+    if region != "Всички":
+        parts.append(f"Регион: {region}")
+    if has_district and district != "Всички":
+        parts.append(f"Брик: {district}")
+    return " | ".join(parts) if parts else "Всички региони"
+
+
+def render_evolution_index_tab(
+    df_filtered: pd.DataFrame,
+    df_national: pd.DataFrame,
+    periods: list,
+    filters: dict,
+    period_col: str = "Quarter",
+) -> None:
     """
     Рендерира таба 'Еволюционен Индекс'.
     
     Параметри
     ---------
-    df : pd.DataFrame
-        Филтрирани данни (уважава Region/Brick от sidebar)
+    df_filtered : pd.DataFrame
+        Данни филтрирани по Region/Brick от sidebar
+    df_national : pd.DataFrame
+        Пълни национални данни (всички региони)
     periods : list
         Сортирани периоди
+    filters : dict
+        Текущи филтри от sidebar (region, district, has_district)
     period_col : str
         Име на колоната с периоди
     """
     st.subheader("📊 Еволюционен Индекс")
+    
+    # Location selector: National или Region/Brick от sidebar
+    location_mode = st.radio(
+        "Регион/Брик",
+        options=["national", "sidebar"],
+        format_func=lambda x: "Всички региони (национално)" if x == "national" else "Регион/Брик от sidebar",
+        horizontal=True,
+        key="ei_location",
+    )
+    
+    df = df_national if location_mode == "national" else df_filtered
+    location_label = "Всички региони" if location_mode == "national" else _get_location_label(filters)
     
     drugs_for_select = sorted(
         df[~df["Drug_Name"].apply(_is_atc_class)]["Drug_Name"].unique()
@@ -166,14 +205,18 @@ def render_evolution_index_tab(df: pd.DataFrame, periods: list, period_col: str 
     # Общ EI – претеглена средна по продажби (референтен период)
     overall_ei = (weighted_ei_sum / total_sales_ref) if total_sales_ref > 0 else None
     
-    # Голяма метрика – Общ Еволюционен Индекс на избора
+    # Голяма метрика – Общ Еволюционен Индекс, контекстуален за локация
+    drugs_display = ", ".join(sel_drugs) if len(sel_drugs) <= 3 else f"{len(sel_drugs)} медикамента"
     st.markdown("---")
-    st.markdown("### Общ Еволюционен Индекс на избора")
+    st.markdown(f"### Еволюционен Индекс за **{drugs_display}** в **{location_label}**")
     if overall_ei is not None:
         st.metric(label=f"{ref_period} vs {base_period}", value=f"{overall_ei:.1f}", delta=None)
     else:
         st.metric(label=f"{ref_period} vs {base_period}", value="—", delta=None)
-    st.caption("EI > 100 означава, че продуктът расте по-бързо от пазарния сегмент.")
+    st.caption(
+        "EI > 100 означава, че продуктът расте по-бързо от пазарния сегмент. "
+        f"Претеглено по продажби в {location_label} (референтен период)."
+    )
     
     # Таблица: Drug Name | Sales (Ref) | Sales (Base) | Growth % | Class Growth % | EI
     st.markdown("---")
