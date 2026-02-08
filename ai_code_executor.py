@@ -18,8 +18,26 @@ import sys
 from contextlib import redirect_stdout, redirect_stderr
 import traceback
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_redundant_imports(code: str) -> str:
+    """
+    Премахва import редове за pandas и plotly - pd, px, go са вече в safe_globals.
+    Това предотвратява ImportError: import not found в sandbox environment.
+    """
+    lines = []
+    for line in code.split('\n'):
+        stripped = line.strip()
+        if stripped.startswith('import pandas') or stripped.startswith('import plotly'):
+            continue
+        # import ... as pd / as px / as go
+        if re.match(r'^from\s+(pandas|plotly)\s+import', stripped):
+            continue
+        lines.append(line)
+    return '\n'.join(lines)
 
 
 class CodeExecutionError(Exception):
@@ -91,6 +109,9 @@ def safe_exec(
         'fig': None,
     }
     
+    # Премахваме import редове – pd, px, go са вече в safe_globals
+    code = _strip_redundant_imports(code)
+    
     # Capture stdout/stderr
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
@@ -154,11 +175,12 @@ def generate_analysis_code(
 Write Python code to analyze the data and answer the question.
 
 **Available data:**
-- master_data.csv with columns: Region, Drug_Name, District, Quarter, Units, Source
-- You can use: pandas (pd), plotly.express (px), plotly.graph_objects (go)
+- master_data.csv (path in variable `master_data_path`)
+- Columns: Region, Drug_Name, District, Quarter, Units, Source
+- DO NOT use import statements - pd, px, go are ALREADY available in the environment
 
 **Requirements:**
-1. Load data: `df = pd.read_csv(master_data_path)`
+1. Load data: `df = pd.read_csv(master_data_path)` – use the variable, not a hardcoded filename
 2. Perform the analysis
 3. Store the answer in variable `result` (string or number)
 4. Create a Plotly chart in variable `fig` (if visualization makes sense)

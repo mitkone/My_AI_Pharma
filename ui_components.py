@@ -716,27 +716,28 @@ def show_market_share_table(
             textposition='inside',
             textfont=dict(color='white', size=11, family='Arial Black'),
             hovertemplate='<b>%{fullData.name}</b><br>' +
-                         '%{x}<br>' +
+                         '<b>%{x}</b><br>' +
                          'Market Share: <b>%{y:.2f}%</b><extra></extra>'
         ))
     
-    # Layout - Mobile-first: легенда долу
+    # Layout - увеличена графика, autoscale, по-четливи tooltips
     fig.update_layout(
         barmode='stack',
+        autosize=True,
         xaxis_title=period_col,
         xaxis=dict(
             categoryorder='array',
             categoryarray=sorted_periods,
-            title_font=dict(size=14),
+            title_font=dict(size=15),
             tickfont=dict(size=14),
             autorange=True,
         ),
         yaxis_title='Market Share (%)',
         yaxis=dict(
             range=[0, 100],
-            title_font=dict(size=14),
+            title_font=dict(size=15),
             tickfont=dict(size=14),
-            autorange=False,  # Keep 0-100 for share
+            autorange=False,
         ),
         legend=dict(
             orientation="h",
@@ -750,12 +751,20 @@ def show_market_share_table(
             font=dict(size=12, family="Arial", color="black")
         ),
         hovermode='x unified',
-        hoverlabel=dict(bgcolor="white", font_size=14),
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=16,
+            font_family="Arial",
+            font_color="#1a1a1a",
+            bordercolor="#333",
+            borderwidth=1,
+            padding=10,
+        ),
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
-        height=config.MOBILE_CHART_HEIGHT,
-        margin=dict(l=0, r=0, t=30, b=0),
+        height=config.MARKET_SHARE_CHART_HEIGHT,
+        margin=dict(l=50, r=50, t=40, b=80),
     )
     
     st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)

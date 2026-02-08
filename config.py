@@ -51,6 +51,7 @@ METRICS = ["Units (опак.)"]
 # Височина на графики - Mobile-first: фиксирана на 500px
 CHART_HEIGHT = 500
 BRICK_CHART_HEIGHT = 500
+MARKET_SHARE_CHART_HEIGHT = 650  # По-голяма за по-четливи tooltips и autoscale
 TIMELINE_CHART_HEIGHT = 500
 COMPARISON_CHART_HEIGHT = 500
 
