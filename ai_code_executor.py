@@ -272,12 +272,14 @@ def create_mobile_friendly_figure(fig: go.Figure) -> go.Figure:
         ),
         xaxis=dict(
             tickangle=-45,
-            title_font=dict(size=14),  # По-голям font за axis labels
-            tickfont=dict(size=14)
+            title_font=dict(size=14),
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         yaxis=dict(
-            title_font=dict(size=14),  # По-голям font за axis labels
-            tickfont=dict(size=14)
+            title_font=dict(size=14),
+            tickfont=dict(size=14),
+            autorange=True,
         ),
     )
     

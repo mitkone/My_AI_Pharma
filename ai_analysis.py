@@ -8,6 +8,7 @@ AI анализ на фармацевтични данни с OpenAI + Code Exec
 """
 
 import os
+import tempfile
 import streamlit as st
 import pandas as pd
 from typing import Optional
@@ -232,16 +233,16 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
     st.subheader("🤖 AI Analyst с Code Execution")
     st.markdown(
         "**Upgraded AI:** Пиши Python код, изпълнявай го директно и визуализирай резултатите! "
-        "AI чете от `master_data.csv` и генерира отговори с графики."
+        "AI използва **същите данни** като dashboard-а (текущите филтри)."
     )
     
-    # Проверка за master_data.csv
-    master_data_path = Path(config.DATA_DIR) / "master_data.csv"
-    if not master_data_path.exists():
-        st.error("⚠️ master_data.csv не е намерен! Моля генерирай го първо.")
-        if st.button("📊 Генерирай master_data.csv"):
-            st.info("Изпълни: `python create_master_data.py`")
-        return
+    # Използваме същия DataFrame като dashboard-а: записваме го във временен CSV за AI кода
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8-sig") as tmp:
+        tmp_path = Path(tmp.name)
+    df.to_csv(tmp_path, index=False, encoding="utf-8-sig")
+    
+    if df.empty:
+        st.warning("Няма данни за текущите филтри. Промени филтрите в sidebar и опитай отново.")
     
     # ===== SUGGESTED QUESTIONS (БУТОНИ) =====
     st.markdown("### 💡 Бързи въпроси")
@@ -298,8 +299,12 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
             result = execute_ai_code_analysis(
                 question=ai_question,
                 product_name=sel_product,
-                master_data_path=master_data_path
+                master_data_path=tmp_path
             )
+        try:
+            tmp_path.unlink(missing_ok=True)  # Изтриваме временния CSV
+        except Exception:
+            pass
         
         # Показване на резултатите (Mobile-friendly)
         if result['success']:

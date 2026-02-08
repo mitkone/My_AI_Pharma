@@ -544,12 +544,14 @@ def create_timeline_chart(
         xaxis=dict(
             categoryorder="array",
             categoryarray=periods,
-            title_font=dict(size=14),  # По-голям font за axis
-            tickfont=dict(size=14)     # По-голям font за labels
+            title_font=dict(size=14),
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         yaxis=dict(
-            title_font=dict(size=14),  # По-голям font за Y axis
-            tickfont=dict(size=14)
+            title_font=dict(size=14),
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         # Легенда ДОЛУ (Mobile-first: още по-долу за да не смачква графиката)
         legend=dict(
@@ -724,13 +726,15 @@ def show_market_share_table(
             categoryorder='array',
             categoryarray=sorted_periods,
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         yaxis_title='Market Share (%)',
         yaxis=dict(
             range=[0, 100],
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=False,  # Keep 0-100 for share
         ),
         legend=dict(
             orientation="h",
@@ -743,10 +747,10 @@ def show_market_share_table(
             borderwidth=1,
             font=dict(size=12, family="Arial", color="black")
         ),
-        hovermode='closest',  # Click/tap elsewhere to dismiss tooltip
-        dragmode=False,       # Prevent accidental panning on mobile
-        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
-        margin=dict(l=0, r=0, t=30, b=0)  # Минимални margins за mobile
+        hovermode='closest',
+        dragmode=False,
+        height=config.MOBILE_CHART_HEIGHT,
+        margin=dict(l=0, r=0, t=30, b=0)
     )
     
     st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
@@ -869,18 +873,19 @@ def create_brick_charts(
         xaxis=dict(
             title="",
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         yaxis=dict(
             title="Опаковки",
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
-        # Легенда ДОЛУ (Mobile-first)
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.5,  # Още по-долу за mobile
+            y=-0.5,
             xanchor="center",
             x=0.5
         ),
@@ -921,18 +926,19 @@ def create_brick_charts(
         xaxis=dict(
             title="",
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         yaxis=dict(
             title="Дял (%)",
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
-        # Легенда ДОЛУ (Mobile-first)
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=-0.5,  # Още по-долу за mobile
+            y=-0.5,
             xanchor="center",
             x=0.5
         ),

@@ -133,12 +133,14 @@ def create_period_comparison(
             title="Продукт",
             tickangle=-45,
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         yaxis=dict(
             title="Опаковки",
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         barmode='group',
         height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
@@ -262,12 +264,14 @@ def create_regional_comparison(
             title="Регион",
             tickangle=-45,
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         yaxis=dict(
             title="Опаковки",
             title_font=dict(size=14),
-            tickfont=dict(size=14)
+            tickfont=dict(size=14),
+            autorange=True,
         ),
         barmode='stack',
         height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
