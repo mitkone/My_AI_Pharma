@@ -254,6 +254,16 @@ st.markdown("---")
 
 st.sidebar.header("📊 Филтри")
 
+# Reset All Filters бутон
+FILTER_KEYS = ["sb_region", "sb_product", "sb_district", "sb_competitors", "quick_search_drug", "drug_search_filter", "drug_suggest_radio"]
+with st.sidebar.container():
+    if st.button("🔄 Изчисти всички филтри", use_container_width=True, type="secondary", key="reset_filters_btn"):
+        for k in FILTER_KEYS:
+            if k in st.session_state:
+                del st.session_state[k]
+        st.rerun()
+st.sidebar.markdown("")  # малък разстояние
+
 # Показване на заредените категории
 if "Source" in df_raw.columns:
     sources = sorted(df_raw["Source"].unique())

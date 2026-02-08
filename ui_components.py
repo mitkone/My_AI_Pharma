@@ -43,7 +43,8 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
         "1. Регион",
         regions,
         index=0,
-        help="Географска област (Пловдив, Варна, Бургас...) - избери \"Всички\" за национален преглед"
+        help="Географска област (Пловдив, Варна, Бургас...) - избери \"Всички\" за национален преглед",
+        key="sb_region",
     )
     
     # 2. Медикамент (основен продукт) - с поддръжка за Quick Search default
@@ -58,7 +59,8 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
         "2. Медикамент (основен)",
         drugs,
         index=product_index,
-        help="Твоят продукт за анализ (автоматично избран от Quick Search)"
+        help="Твоят продукт за анализ (автоматично избран от Quick Search)",
+        key="sb_product",
     )
     
     # 3. Brick (район)
@@ -66,7 +68,8 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
         "3. Brick (район)",
         districts,
         index=0,
-        help="Малък географски район - налично само ако имаш \"Total Bricks\" данни"
+        help="Малък географски район - налично само ако имаш \"Total Bricks\" данни",
+        key="sb_district",
     ) if has_district else "Всички"
     
     # 4. Конкуренти - включваме и категориите (класовете)
@@ -165,6 +168,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
         competitor_options,
         default=default_competitors,
         help=help_text,
+        key="sb_competitors",
     )
     
     # Обработваме избраните конкуренти - махаме префикса и продажбите от имената
