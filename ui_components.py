@@ -720,17 +720,19 @@ def show_market_share_table(
             name=drug,
             orientation='h',
             marker_color=colors[i % len(colors)],
-            text=pivot[drug].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x > 0 else ""),
-            textposition='outside',  # Всички етикети отвън – винаги видими дори при малки сегменти
+            text=pivot[drug].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x >= 0.5 else ""),
+            textposition='inside',
             textfont=dict(color='white', size=11, family='Arial'),
             hovertemplate='<b>%{fullData.name}</b><br>' +
                          '<b>%{y}</b><br>' +
                          'Market Share: <b>%{x:.2f}%</b><extra></extra>'
         ))
     
-    # Layout – mobile-optimized: horizontal bars, фиксирана височина, минимални margins
+    # Layout – винаги широка лента, проценти вътре (без отрязване), достатъчно височина
     fig.update_layout(
         barmode='stack',
+        bargap=0.15,
+        bargroupgap=0.02,
         xaxis_title='Market Share (%)',
         xaxis=dict(
             range=[0, 100],
@@ -744,7 +746,7 @@ def show_market_share_table(
             categoryarray=sorted_periods,
             title_font=dict(size=14),
             tickfont=dict(size=12),
-            autorange='reversed',  # Q1 най-горе
+            autorange='reversed',
         ),
         showlegend=True,
         legend=dict(
@@ -764,8 +766,10 @@ def show_market_share_table(
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
-        height=max(config.MARKET_SHARE_CHART_HEIGHT_MOBILE, 55 * len(sorted_periods)),  # Винаги разгърнат
-        margin=dict(l=10, r=60, t=30, b=10),  # r=60 за етикети отвън
+        height=max(700, 80 * len(sorted_periods)),
+        margin=dict(l=10, r=15, t=30, b=10),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
     )
     
     st.plotly_chart(
