@@ -711,7 +711,7 @@ def show_market_share_table(
         '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
     ]
     
-    # Horizontal stacked bar chart – по-четливо на мобилни
+    # Horizontal stacked bar chart – винаги разгърнат, всички % видими (outside = винаги четливи)
     fig = go.Figure()
     for i, drug in enumerate(pivot.columns):
         fig.add_trace(go.Bar(
@@ -720,10 +720,9 @@ def show_market_share_table(
             name=drug,
             orientation='h',
             marker_color=colors[i % len(colors)],
-            text=pivot[drug].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x >= 2 else ""),
-            textposition='inside',
-            textfont=dict(color='white', size=11, family='Arial Black'),
-            insidetextanchor='middle',
+            text=pivot[drug].apply(lambda x: f"{x:.1f}%" if pd.notna(x) and x > 0 else ""),
+            textposition='outside',  # Всички етикети отвън – винаги видими дори при малки сегменти
+            textfont=dict(color='white', size=11, family='Arial'),
             hovertemplate='<b>%{fullData.name}</b><br>' +
                          '<b>%{y}</b><br>' +
                          'Market Share: <b>%{x:.2f}%</b><extra></extra>'
@@ -765,8 +764,8 @@ def show_market_share_table(
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
-        height=config.MARKET_SHARE_CHART_HEIGHT_MOBILE,
-        margin=dict(l=10, r=10, t=30, b=10),
+        height=max(config.MARKET_SHARE_CHART_HEIGHT_MOBILE, 55 * len(sorted_periods)),  # Винаги разгърнат
+        margin=dict(l=10, r=60, t=30, b=10),  # r=60 за етикети отвън
     )
     
     st.plotly_chart(
