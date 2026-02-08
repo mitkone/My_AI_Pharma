@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple
 import config
 
 
-def create_filters(df: pd.DataFrame) -> dict:
+def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
     """
     Създава sidebar филтри за избор на регион, медикамент, молекула, brick.
     
@@ -21,6 +21,8 @@ def create_filters(df: pd.DataFrame) -> dict:
     ---------
     df : pd.DataFrame
         Данни за филтриране
+    default_product : str, optional
+        Продукт за автоматично избиране (от Quick Search)
     
     Връща
     ------
@@ -44,12 +46,19 @@ def create_filters(df: pd.DataFrame) -> dict:
         help="Географска област (Пловдив, Варна, Бургас...) - избери \"Всички\" за национален преглед"
     )
     
-    # 2. Медикамент (основен продукт)
+    # 2. Медикамент (основен продукт) - с поддръжка за Quick Search default
+    product_index = 0
+    if default_product and default_product in drugs:
+        try:
+            product_index = drugs.index(default_product)
+        except ValueError:
+            product_index = 0
+    
     sel_product = st.sidebar.selectbox(
         "2. Медикамент (основен)",
         drugs,
-        index=0,
-        help="Твоят продукт за анализ"
+        index=product_index,
+        help="Твоят продукт за анализ (автоматично избран от Quick Search)"
     )
     
     # 3. Brick (район)
@@ -498,7 +507,7 @@ def create_timeline_chart(
         if col not in df_agg.columns:
             df_agg[col] = None
     
-    # Създаване на линейна графика
+    # Създаване на линейна графика с хронологичен ред на периодите
     fig = px.line(
         df_agg,
         x=period_col,
@@ -507,6 +516,7 @@ def create_timeline_chart(
         markers=True,
         title=title,
         custom_data=custom_cols,
+        category_orders={period_col: periods}  # Изрично задаваме хронологичния ред
     )
     
     # Hover template - опростен (без Market Share)
@@ -525,22 +535,31 @@ def create_timeline_chart(
     )
     
     fig.update_layout(
-        height=config.CHART_HEIGHT,
-        legend_title="",  # Премахнат "Продукт" заглавие
+        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
+        legend_title="",
         showlegend=True,
         hovermode="x unified",
         xaxis_tickangle=-45,
-        xaxis={"categoryorder": "array", "categoryarray": periods},
-        # Легенда горе (да не пречи на имената на регионите/бриковете)
+        xaxis=dict(
+            categoryorder="array",
+            categoryarray=periods,
+            title_font=dict(size=14),  # По-голям font за axis
+            tickfont=dict(size=14)     # По-голям font за labels
+        ),
+        yaxis=dict(
+            title_font=dict(size=14),  # По-голям font за Y axis
+            tickfont=dict(size=14)
+        ),
+        # Легенда ДОЛУ (Mobile-first: още по-долу за да не смачква графиката)
         legend=dict(
-            orientation="h",  # Хоризонтална легенда
-            yanchor="top",
-            y=1.15,  # НАД графиката
+            orientation="h",
+            yanchor="bottom",
+            y=-0.5,  # Още по-долу за mobile
             xanchor="center",
             x=0.5
         ),
-        margin=dict(b=80, t=120, l=50, r=50),  # Повече място горе за легендата
-        font=dict(size=12),  # По-големи шрифтове за мобилни
+        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins за mobile
+        font=dict(size=12),
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -637,7 +656,7 @@ def show_market_share_table(
     is_national: bool = True
 ) -> None:
     """
-    Показва stacked bar chart с Market Share по периоди.
+    Показва stacked bar chart с Market Share по всички тримесечия.
     
     Параметри
     ---------
@@ -669,8 +688,10 @@ def show_market_share_table(
     # Pivot таблица: периоди x продукти
     pivot = df_drugs.pivot(index=period_col, columns="Drug_Name", values="Market_Share_%")
     
-    # Създаваме stacked bar chart
-    fig = go.Figure()
+    # Хронологично сортиране на периодите
+    from data_processing import get_period_sort_key
+    sorted_periods = sorted(pivot.index.tolist(), key=get_period_sort_key)
+    pivot = pivot.reindex(sorted_periods)  # Пренареждаме редовете
     
     # Цветова палитра
     colors = [
@@ -678,7 +699,8 @@ def show_market_share_table(
         '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
     ]
     
-    # Добавяме bar за всеки продукт
+    # Stacked bar chart - всички тримесечия
+    fig = go.Figure()
     for i, drug in enumerate(pivot.columns):
         fig.add_trace(go.Bar(
             x=pivot.index,
@@ -693,26 +715,36 @@ def show_market_share_table(
                          'Market Share: <b>%{y:.2f}%</b><extra></extra>'
         ))
     
-    # Layout - подобрена легенда за четливост
+    # Layout - Mobile-first: легенда долу
     fig.update_layout(
         barmode='stack',
         xaxis_title=period_col,
+        xaxis=dict(
+            categoryorder='array',
+            categoryarray=sorted_periods,
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
         yaxis_title='Market Share (%)',
-        yaxis=dict(range=[0, 100]),
+        yaxis=dict(
+            range=[0, 100],
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
         legend=dict(
-            orientation="v",
-            yanchor="top",
-            y=1.0,
-            xanchor="left",
-            x=1.02,
+            orientation="h",
+            yanchor="bottom",
+            y=-0.5,
+            xanchor="center",
+            x=0.5,
             bgcolor="rgba(255, 255, 255, 0.95)",
             bordercolor="rgba(0, 0, 0, 0.2)",
             borderwidth=1,
             font=dict(size=12, family="Arial", color="black")
         ),
         hovermode='x unified',
-        height=500,
-        margin=dict(l=50, r=200, t=50, b=50)
+        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
+        margin=dict(l=0, r=0, t=30, b=0)  # Минимални margins за mobile
     )
     
     st.plotly_chart(fig, use_container_width=True)
@@ -829,20 +861,28 @@ def create_brick_charts(
     )
     
     fig_geo.update_layout(
-        height=config.CHART_HEIGHT,
-        legend_title="",  # Премахнат заглавие на легендата
+        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
+        legend_title="",
         xaxis_tickangle=-45,
-        xaxis_title="",  # Премахва етикета на оста
-        yaxis_title="Опаковки",
-        # Легенда горе (да не пречи)
+        xaxis=dict(
+            title="",
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
+        yaxis=dict(
+            title="Опаковки",
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
+        # Легенда ДОЛУ (Mobile-first)
         legend=dict(
             orientation="h",
-            yanchor="top",
-            y=1.15,  # НАД графиката
+            yanchor="bottom",
+            y=-0.5,  # Още по-долу за mobile
             xanchor="center",
             x=0.5
         ),
-        margin=dict(b=80, t=120, l=50, r=50),  # Повече място горе
+        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins
         font=dict(size=12),
     )
     st.plotly_chart(fig_geo, use_container_width=True)
@@ -871,20 +911,28 @@ def create_brick_charts(
     )
     
     fig_share.update_layout(
-        height=config.BRICK_CHART_HEIGHT,
-        legend_title="",  # Премахнат заглавие на легендата
+        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
+        legend_title="",
         xaxis_tickangle=-45,
-        xaxis_title="",
-        yaxis_title="Дял (%)",
-        # Легенда горе (да не пречи)
+        xaxis=dict(
+            title="",
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
+        yaxis=dict(
+            title="Дял (%)",
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
+        # Легенда ДОЛУ (Mobile-first)
         legend=dict(
             orientation="h",
-            yanchor="top",
-            y=1.15,  # НАД графиката
+            yanchor="bottom",
+            y=-0.5,  # Още по-долу за mobile
             xanchor="center",
             x=0.5
         ),
-        margin=dict(b=80, t=120, l=50, r=50),  # Повече място горе
+        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins
         font=dict(size=12),
     )
     st.plotly_chart(fig_share, use_container_width=True)

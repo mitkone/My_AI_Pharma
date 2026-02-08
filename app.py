@@ -91,18 +91,180 @@ if df_raw.empty:
 
 
 # ============================================================================
-# SIDEBAR - ОПЦИИ И ФИЛТРИ
+# SIDEBAR - ACCESS CONTROL & ОПЦИИ
 # ============================================================================
 
-st.sidebar.header("Опции")
+st.sidebar.header("🔐 Достъп")
+
+# Password protection за Admin Panel
+admin_password = st.sidebar.text_input(
+    "Admin Password",
+    type="password",
+    placeholder="Въведи парола за admin",
+    help="Само admin може да качва нови файлове"
+)
+
+is_admin = (admin_password == "1234")
+
+# Показване на роля
+if is_admin:
+    st.sidebar.success("✅ Admin режим")
+else:
+    st.sidebar.info("👤 User режим")
+
+st.sidebar.divider()
+
+# ===== ADMIN PANEL (само за admin) =====
+if is_admin:
+    st.sidebar.header("⚙️ Admin Panel")
+    
+    # File uploader за нови Excel файлове
+    uploaded_file = st.sidebar.file_uploader(
+        "📤 Качи нов Excel файл",
+        type=["xlsx", "xls"],
+        help="Качи Excel файл с фармацевтични данни (същият формат като другите)"
+    )
+    
+    if uploaded_file is not None:
+        # Обработка на качения файл
+        st.sidebar.info(f"Качен: {uploaded_file.name}")
+        
+        if st.sidebar.button("✅ Обработи и добави към master_data.csv", type="primary"):
+            from process_excel_hierarchy import process_pharma_excel
+            from create_master_data import robust_clean_excel
+            from data_processing import extract_source_name
+            import io
+            
+            with st.spinner("Обработка на новия файл..."):
+                try:
+                    # Запазваме файла временно
+                    excel_path = config.DATA_DIR / uploaded_file.name
+                    with open(excel_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Обработваме файла
+                    source_name = extract_source_name(uploaded_file.name)
+                    df_new = robust_clean_excel(excel_path, source_name)
+                    
+                    if not df_new.empty:
+                        # Зареждаме съществуващия master_data.csv
+                        master_path = config.DATA_DIR / "master_data.csv"
+                        
+                        if master_path.exists():
+                            df_master = pd.read_csv(master_path)
+                            # Добавяме новите данни
+                            df_updated = pd.concat([df_master, df_new], ignore_index=True)
+                        else:
+                            df_updated = df_new
+                        
+                        # Премахваме дупликати
+                        df_updated = df_updated.drop_duplicates(
+                            subset=["Region", "Drug_Name", "District", "Quarter", "Source"],
+                            keep="last"  # Запазваме най-новите
+                        )
+                        
+                        # Запазваме обновения master_data.csv
+                        df_updated.to_csv(master_path, index=False, encoding="utf-8-sig")
+                        
+                        st.sidebar.success(f"✅ Добавени {len(df_new)} нови реда!")
+                        st.sidebar.info("Моля рестартирай апликацията за да заредиш новите данни.")
+                        
+                        # Бутон за рестартиране
+                        if st.sidebar.button("🔄 Рестартирай сега"):
+                            st.rerun()
+                    else:
+                        st.sidebar.error("Файлът е празен след обработка!")
+                
+                except Exception as e:
+                    st.sidebar.error(f"Грешка: {e}")
+    
+    st.sidebar.divider()
+
+# ============================================================================
+# QUICK SEARCH / ASK AI (ПРЕДИ филтрите - Mobile-First: Top priority)
+# ============================================================================
+
+st.markdown("### 🔍 Quick Search / Ask AI")
+quick_search = st.text_input(
+    "Търси медикамент",
+    placeholder="напр. 'Lipocante', 'Fenofibrate' (работи дори с typo-s)",
+    help="Въведи име на медикамент или молекула. AI ще намери резултати дори при грешки в изписването.",
+    key="quick_search_input",
+    label_visibility="collapsed"
+)
+
+# Обработка на Quick Search query
+quick_search_result = None
+if quick_search:
+    from difflib import get_close_matches
+    import re
+    
+    # Функция за разпознаване на ATC класове
+    def is_atc_class(drug_name):
+        if pd.isna(drug_name):
+            return False
+        name_str = str(drug_name).strip()
+        return bool(re.match(r'^[A-Z]\d{2}[A-Z]\d', name_str))
+    
+    # Вземаме всички уникални Drug_Name (без ATC класове)
+    all_drugs = [d for d in df_raw["Drug_Name"].dropna().unique() if not is_atc_class(d)]
+    
+    # Fuzzy matching за търсенето (tolerance за typos)
+    matches = get_close_matches(quick_search.upper(), [d.upper() for d in all_drugs], n=3, cutoff=0.6)
+    
+    if matches:
+        # Намираме оригиналното име (с правилен case)
+        matched_drug = next(d for d in all_drugs if d.upper() == matches[0])
+        quick_search_result = matched_drug
+        
+        # Запазваме в session_state за да филтрираме автоматично
+        st.session_state['quick_search_drug'] = matched_drug
+        
+        # Показваме резултата
+        st.success(f"✅ Намерен: **{matched_drug}**")
+        
+        # Генерираме 2-line summary
+        periods_temp = get_sorted_periods(df_raw)
+        drug_data = df_raw[df_raw["Drug_Name"] == matched_drug].copy()
+        
+        if not drug_data.empty and len(periods_temp) >= 2:
+            last_period = periods_temp[-1]
+            prev_period = periods_temp[-2]
+            
+            last_units = drug_data[drug_data["Quarter"] == last_period]["Units"].sum()
+            prev_units = drug_data[drug_data["Quarter"] == prev_period]["Units"].sum()
+            growth_pct = ((last_units - prev_units) / prev_units * 100) if prev_units > 0 else 0
+            
+            # Брой активни региони
+            regions_count = drug_data[drug_data["Quarter"] == last_period]["Region"].nunique()
+            
+            # 2-line summary
+            growth_emoji = "📈" if growth_pct > 0 else "📉"
+            st.info(
+                f"{growth_emoji} **Продажби {last_period}**: {int(last_units):,} опак. ({growth_pct:+.1f}% vs {prev_period})  \n"
+                f"🗺️ **Региони**: {regions_count} | **Общо периоди**: {len(drug_data['Quarter'].unique())}"
+            )
+    else:
+        st.warning(f"❌ Не намерих медикамент със сходно име на '{quick_search}'. Опитай друго име.")
+        # Clear previous search
+        if 'quick_search_drug' in st.session_state:
+            del st.session_state['quick_search_drug']
+
+st.markdown("---")
+
+# ============================================================================
+# SIDEBAR - ФИЛТРИ (с интеграция на Quick Search)
+# ============================================================================
+
+st.sidebar.header("📊 Филтри")
 
 # Показване на заредените категории
 if "Source" in df_raw.columns:
     sources = sorted(df_raw["Source"].unique())
     st.sidebar.caption(f"Заредени: {', '.join(sources)}")
 
-# Създаване на филтри
-filters = create_filters(df_raw)
+# Създаване на филтри (с default от Quick Search ако има)
+filters = create_filters(df_raw, default_product=st.session_state.get('quick_search_drug'))
 
 # Прилагане на филтрите
 df_filtered = apply_filters(df_raw, filters)
@@ -127,16 +289,109 @@ df_chart = df_filtered[df_filtered["Drug_Name"].isin(products_on_chart)].copy()
 # Сортиране на периодите
 periods = get_sorted_periods(df_raw)
 
+# ============================================================================
+# KPI МЕТРИКИ (Mobile-First: Първото нещо което се вижда)
+# ============================================================================
+
+# Изчисляване на ключови метрики за избрания продукт
+selected_product_data = df_filtered[df_filtered["Drug_Name"] == filters["product"]].copy()
+
+if not selected_product_data.empty and len(periods) >= 2:
+    # Последни 2 периода
+    last_period = periods[-1]
+    prev_period = periods[-2]
+    
+    # Units за последния период
+    last_units = selected_product_data[selected_product_data["Quarter"] == last_period]["Units"].sum()
+    prev_units = selected_product_data[selected_product_data["Quarter"] == prev_period]["Units"].sum()
+    
+    # % Ръст
+    growth_pct = ((last_units - prev_units) / prev_units * 100) if prev_units > 0 else 0
+    
+    # Market Share (само ако има Source колона)
+    market_share_pct = 0
+    if "Source" in df_raw.columns:
+        # Намираме класа за избрания продукт
+        product_source = selected_product_data["Source"].iloc[0] if len(selected_product_data) > 0 else None
+        if product_source:
+            # ATC клас проверка
+            def is_atc_class(drug_name):
+                if pd.isna(drug_name):
+                    return False
+                parts = str(drug_name).split()
+                if not parts:
+                    return False
+                first_word = parts[0]
+                return (
+                    len(first_word) >= 4 and len(first_word) <= 7 and
+                    first_word[0].isalpha() and any(c.isdigit() for c in first_word) and
+                    first_word.isupper() and len(parts) >= 2 and
+                    drug_name not in ["GRAND TOTAL", "Grand Total"] and
+                    not drug_name.startswith("Region")
+                )
+            
+            df_classes = df_raw[df_raw["Drug_Name"].apply(is_atc_class)].copy()
+            if len(df_classes) > 0:
+                matching_classes = df_classes[df_classes["Source"] == product_source]["Drug_Name"].unique()
+                if len(matching_classes) > 0:
+                    class_name = matching_classes[0]
+                    class_last = df_classes[
+                        (df_classes["Drug_Name"] == class_name) & 
+                        (df_classes["Quarter"] == last_period)
+                    ]["Units"].sum()
+                    
+                    national_product_last = df_raw[
+                        (df_raw["Drug_Name"] == filters["product"]) & 
+                        (df_raw["Quarter"] == last_period)
+                    ]["Units"].sum()
+                    
+                    market_share_pct = (national_product_last / class_last * 100) if class_last > 0 else 0
+    
+    # Брой региони с продажби
+    regions_count = selected_product_data[selected_product_data["Quarter"] == last_period]["Region"].nunique()
+    
+    # Показваме метриките (Mobile-First: вертикално)
+    st.markdown("### 📊 Ключови показатели")
+    
+    st.metric(
+        label=f"Продажби {last_period}",
+        value=f"{int(last_units):,} опак.",
+        delta=f"{growth_pct:+.1f}%"
+    )
+    
+    st.metric(
+        label="Market Share (национално)",
+        value=f"{market_share_pct:.2f}%",
+        delta=None
+    )
+    
+    st.metric(
+        label="Активни региони",
+        value=f"{regions_count}",
+        delta=None
+    )
+    
+    # Ръст в опаковки
+    growth_units = int(last_units - prev_units)
+    st.metric(
+        label="Промяна опаковки",
+        value=f"{abs(growth_units):,}",
+        delta=f"{'↑' if growth_units > 0 else '↓'} {abs(growth_pct):.1f}%"
+    )
+    
+    st.markdown("---")
+
 
 # ============================================================================
-# ТАБОВЕ - ОСНОВНИ ВИЗУАЛИЗАЦИИ
+# ТАБОВЕ - ДИНАМИЧНИ СПОРЕД РОЛЯ
 # ============================================================================
 
+# Табове – всички потребители виждат Dashboard, Brick, Сравнение и AI Analyst
 tab_timeline, tab_brick, tab_comparison, tab_ai = st.tabs([
-    "📈 По тримесечие",
+    "📈 Dashboard",
     "🗺️ По Brick (райони)",
     "⚖️ Сравнение",
-    "🤖 AI Анализ"
+    "🤖 AI Analyst"
 ])
 
 # --- ТАБ 1: ПО ТРИМЕСЕЧИЕ ---
@@ -178,7 +433,7 @@ with tab_timeline:
                 show_market_share_table(df_regional_share, period_col="Quarter", is_national=False)
 
 
-# --- ТАБ 2: ПО BRICK (РАЙОНИ) ---
+# --- ТАБ 2: ПО BRICK ---
 with tab_brick:
     create_brick_charts(
         df=df_raw,  # Използваме пълните данни, не филтрираните
@@ -189,7 +444,7 @@ with tab_brick:
     )
 
 
-# --- ТАБ 3: СРАВНЕНИЕ НА ПЕРИОДИ ---
+# --- ТАБ 3: СРАВНЕНИЕ ---
 with tab_comparison:
     # Period comparison
     create_period_comparison(
@@ -209,7 +464,7 @@ with tab_comparison:
         )
 
 
-# --- ТАБ 4: AI АНАЛИЗ ---
+# --- ТАБ 4: AI ANALYST ---
 with tab_ai:
     render_ai_analysis_tab(
         df=df_filtered,

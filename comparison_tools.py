@@ -35,26 +35,22 @@ def create_period_comparison(
         st.warning("Нужни са поне 2 периода за сравнение.")
         return
     
-    # Избор на периоди за сравнение
-    col1, col2 = st.columns(2)
+    # Избор на периоди за сравнение (Mobile-first: вертикално)
+    period1 = st.selectbox(
+        "Период 1 (базов)",
+        periods,
+        index=max(0, len(periods) - 5),  # Преди 4 тримесечия
+        key="period1_comp",
+        help="Избери стар период като база за сравнение"
+    )
     
-    with col1:
-        period1 = st.selectbox(
-            "Период 1 (базов)",
-            periods,
-            index=max(0, len(periods) - 5),  # Преди 4 тримесечия
-            key="period1_comp",
-            help="Избери стар период като база за сравнение"
-        )
-    
-    with col2:
-        period2 = st.selectbox(
-            "Период 2 (сравнителен)",
-            periods,
-            index=len(periods) - 1,  # Последен период
-            key="period2_comp",
-            help="Избери нов период за да видиш промяната"
-        )
+    period2 = st.selectbox(
+        "Период 2 (сравнителен)",
+        periods,
+        index=len(periods) - 1,  # Последен период
+        key="period2_comp",
+        help="Избери нов период за да видиш промяната"
+    )
     
     if period1 == period2:
         st.info("Избери различни периоди за сравнение.")
@@ -132,20 +128,28 @@ def create_period_comparison(
     
     fig.update_layout(
         title=f"Сравнение: {period1} vs {period2}",
-        legend_title="",  # Премахнат заглавие на легендата
-        xaxis_title="Продукт",
-        yaxis_title="Опаковки",
+        legend_title="",
+        xaxis=dict(
+            title="Продукт",
+            tickangle=-45,
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
+        yaxis=dict(
+            title="Опаковки",
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
         barmode='group',
-        height=config.CHART_HEIGHT,
-        xaxis_tickangle=-45,
+        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
         legend=dict(
             orientation="h",
-            yanchor="top",
-            y=1.12,  # НАД графиката
+            yanchor="bottom",
+            y=-0.5,  # Още по-долу за mobile
             xanchor="center",
             x=0.5
         ),
-        margin=dict(b=80, t=120, l=50, r=50),  # Повече място горе
+        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins
         font=dict(size=12),
         hovermode="x unified"
     )
@@ -252,20 +256,28 @@ def create_regional_comparison(
     
     fig.update_layout(
         title=f"Регионално разпределение - {period}",
-        legend_title="",  # Премахнат заглавие на легендата
-        xaxis_title="Регион",
-        yaxis_title="Опаковки",
+        legend_title="",
+        xaxis=dict(
+            title="Регион",
+            tickangle=-45,
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
+        yaxis=dict(
+            title="Опаковки",
+            title_font=dict(size=14),
+            tickfont=dict(size=14)
+        ),
         barmode='stack',
-        height=config.CHART_HEIGHT,
-        xaxis_tickangle=-45,
+        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
         legend=dict(
             orientation="h",
-            yanchor="top",
-            y=1.12,  # НАД графиката
+            yanchor="bottom",
+            y=-0.5,  # Още по-долу за mobile
             xanchor="center",
             x=0.5
         ),
-        margin=dict(b=80, t=120, l=50, r=50),  # Повече място горе
+        margin=dict(l=0, r=0, t=30, b=0),  # Минимални margins
         font=dict(size=12),
     )
     

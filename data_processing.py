@@ -147,6 +147,10 @@ def load_all_excel_files(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
     """
     Зарежда всички Excel файлове от директория и ги обединява.
     
+    ПРИОРИТЕТ:
+    1. Ако master_data.csv съществува и е актуален → използва го (БЪРЗО)
+    2. Иначе → обработва Excel файловете поотделно (БАВНО)
+    
     Параметри
     ---------
     data_dir : Path
@@ -157,6 +161,37 @@ def load_all_excel_files(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
     pd.DataFrame
         Обединен DataFrame от всички файлове
     """
+    master_file = data_dir / "master_data.csv"
+    
+    # Проверка за master_data.csv
+    if master_file.exists():
+        try:
+            # Проверка дали е актуален
+            master_mtime = master_file.stat().st_mtime
+            
+            # Намираме най-новия Excel файл
+            excel_files = []
+            for ext in config.EXCEL_EXTENSIONS:
+                excel_files.extend(data_dir.glob(f"*{ext}"))
+            
+            excel_files = [f for f in excel_files if not f.name.startswith(config.TEMP_FILE_PREFIX)]
+            
+            is_fresh = True
+            if excel_files:
+                newest_excel_mtime = max(f.stat().st_mtime for f in excel_files)
+                is_fresh = master_mtime > newest_excel_mtime
+            
+            if is_fresh:
+                logger.info("✓ Зареждане от master_data.csv (БЪРЗО)")
+                df = pd.read_csv(master_file)
+                logger.info(f"✓ Заредени {len(df):,} реда от master_data.csv")
+                return df
+            else:
+                logger.info("⚠ master_data.csv е остарял, обработвам Excel файлове...")
+        
+        except Exception as e:
+            logger.warning(f"Грешка при четене на master_data.csv: {e}")
+            logger.info("Обработвам Excel файлове директно...")
     logger.info(f"Сканиране за Excel файлове в {data_dir}")
     
     frames = []
@@ -223,9 +258,10 @@ def prepare_data_for_display(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_period_sort_key(period: str) -> Tuple[str, int]:
+def get_period_sort_key(period: str) -> Tuple[int, int]:
     """
     Връща ключ за сортиране на периоди (Q1 2023, Jan 2024 и т.н.).
+    Сортира хронологично: първо по година (числово), после по период.
     
     Параметри
     ---------
@@ -234,24 +270,39 @@ def get_period_sort_key(period: str) -> Tuple[str, int]:
     
     Връща
     ------
-    Tuple[str, int]
-        (година, номер_на_период) за сортиране
+    Tuple[int, int]
+        (година_като_число, номер_на_период) за хронологично сортиране
+    
+    Примери
+    -------
+    >>> get_period_sort_key("Q1 2024")
+    (2024, 1)
+    >>> get_period_sort_key("Q4 2023")
+    (2023, 4)
+    >>> get_period_sort_key("Q1 2025")
+    (2025, 1)
     """
     parts = str(period).split()
-    year = parts[-1] if parts else "0"
+    
+    # Извличаме годината (последната част) и конвертираме в int
+    try:
+        year = int(parts[-1]) if parts else 0
+    except (ValueError, IndexError):
+        year = 0
+    
     token = parts[0] if parts else ""
     
-    # Проверка за тримесечие
+    # Проверка за тримесечие (Q1, Q2, Q3, Q4)
     quarter_num = config.QUARTERS.get(token)
     if quarter_num:
         return (year, quarter_num)
     
-    # Проверка за месец
+    # Проверка за месец (Jan, Feb, Mar...)
     month_num = config.MONTHS.get(token)
     if month_num:
         return (year, month_num)
     
-    # По подразбиране
+    # По подразбиране (невалидни периоди отиват в началото)
     return (year, 0)
 
 

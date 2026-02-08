@@ -24,6 +24,10 @@ ENV/
 *_backup.py
 test_*.py
 
+# Master data (too large for Git, auto-generated from Excel)
+master_data.csv
+master_data_backup.csv
+
 # OS files
 .DS_Store
 Thumbs.db

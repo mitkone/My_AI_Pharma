@@ -1,14 +1,25 @@
 """
-AI анализ на фармацевтични данни с OpenAI.
-Позволява на потребителя да задава въпроси за данните и получава
-автоматизиран анализ с препоръки.
+AI анализ на фармацевтични данни с OpenAI + Code Execution.
+
+Позволява на потребителя да задава въпроси за данните и получава:
+- Автоматизиран анализ с препоръки
+- Динамично генериран и изпълнен Python код
+- Визуализации (Plotly charts)
 """
 
 import os
 import streamlit as st
 import pandas as pd
 from typing import Optional
+from pathlib import Path
 import config
+from ai_code_executor import (
+    safe_exec,
+    generate_analysis_code,
+    get_data_summary,
+    create_mobile_friendly_figure,
+    validate_code_safety
+)
 
 
 def check_api_key() -> bool:
@@ -127,9 +138,87 @@ def get_ai_analysis(question: str, data_context: str) -> Optional[str]:
         return None
 
 
+def execute_ai_code_analysis(
+    question: str,
+    product_name: str,
+    master_data_path: Path
+) -> dict:
+    """
+    Изпълнява AI анализ с динамично генериран Python код.
+    
+    Параметри
+    ---------
+    question : str
+        Въпрос от потребителя
+    product_name : str
+        Име на продукта
+    master_data_path : Path
+        Път до master_data.csv
+    
+    Връща
+    ------
+    dict
+        Резултати: 'success', 'result' (text), 'figure', 'code', 'error'
+    """
+    try:
+        from openai import OpenAI
+        
+        # Извличане на data summary
+        data_summary = get_data_summary(master_data_path)
+        
+        # Генериране на prompt за AI
+        prompt = generate_analysis_code(question, product_name, data_summary)
+        
+        # AI генерира код
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        response = client.chat.completions.create(
+            model=config.AI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1500,
+            temperature=0.1,  # По-ниска температура за по-стабилен код
+        )
+        
+        generated_code = response.choices[0].message.content.strip()
+        
+        # Почистване на markdown code blocks ако има
+        if generated_code.startswith("```"):
+            lines = generated_code.split('\n')
+            generated_code = '\n'.join(lines[1:-1])  # Премахва ``` wrapper
+        
+        # Валидация за безопасност
+        is_safe, safety_error = validate_code_safety(generated_code)
+        if not is_safe:
+            return {
+                'success': False,
+                'result': None,
+                'figure': None,
+                'code': generated_code,
+                'error': f"Code safety check failed: {safety_error}"
+            }
+        
+        # Изпълнение на кода
+        execution_result = safe_exec(generated_code, master_data_path)
+        
+        # Mobile-optimize фигурата ако има
+        if execution_result['figure']:
+            execution_result['figure'] = create_mobile_friendly_figure(execution_result['figure'])
+        
+        execution_result['code'] = generated_code
+        return execution_result
+    
+    except Exception as e:
+        return {
+            'success': False,
+            'result': None,
+            'figure': None,
+            'code': None,
+            'error': str(e)
+        }
+
+
 def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list):
     """
-    Рендира таб с AI анализ.
+    Рендира таб с AI анализ + Code Execution.
     
     Параметри
     ---------
@@ -140,34 +229,38 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
     competitors : list
         Конкуренти
     """
-    st.subheader("🤖 AI Анализ на данните")
+    st.subheader("🤖 AI Analyst с Code Execution")
     st.markdown(
-        "AI ще анализира наличните данни и ще предложи възможни причини и решения. "
-        "Избери готов въпрос или напиши свой."
+        "**Upgraded AI:** Пиши Python код, изпълнявай го директно и визуализирай резултатите! "
+        "AI чете от `master_data.csv` и генерира отговори с графики."
     )
+    
+    # Проверка за master_data.csv
+    master_data_path = Path(config.DATA_DIR) / "master_data.csv"
+    if not master_data_path.exists():
+        st.error("⚠️ master_data.csv не е намерен! Моля генерирай го първо.")
+        if st.button("📊 Генерирай master_data.csv"):
+            st.info("Изпълни: `python create_master_data.py`")
+        return
     
     # ===== SUGGESTED QUESTIONS (БУТОНИ) =====
     st.markdown("### 💡 Бързи въпроси")
     st.caption("Кликни на бутон за автоматично попълване:")
     
-    col1, col2 = st.columns(2)
+    suggested_question = None  # За съхраняване на избрания въпрос (Mobile-first: вертикални бутони)
     
-    suggested_question = None  # За съхраняване на избрания въпрос
+    if st.button("🔍 Защо спада ръстът?", use_container_width=True):
+        suggested_question = f"Защо {sel_product} спада в последните периоди? Анализирай възможните причини и предложи решения."
     
-    with col1:
-        if st.button("🔍 Защо спада ръстът?", use_container_width=True):
-            suggested_question = f"Защо {sel_product} спада в последните периоди? Анализирай възможните причини и предложи решения."
-        
-        if st.button("📊 Кой регион е най-слаб?", use_container_width=True):
-            suggested_question = f"Кой регион има най-лоши резултати за {sel_product}? Защо и какво може да се подобри?"
+    if st.button("📊 Кой регион е най-слаб?", use_container_width=True):
+        suggested_question = f"Кой регион има най-лоши резултати за {sel_product}? Защо и какво може да се подобри?"
     
-    with col2:
-        if st.button("🏆 Къде растем най-много?", use_container_width=True):
-            suggested_question = f"В кои региони {sel_product} расте най-бързо и какво правим правилно там?"
-        
-        if st.button("⚔️ Как се справям срещу конкуренти?", use_container_width=True):
-            comp_text = ", ".join(competitors[:3]) if competitors else "конкуренти"
-            suggested_question = f"Как {sel_product} се справя срещу {comp_text}? Какви са силните и слабите страни?"
+    if st.button("🏆 Къде растем най-много?", use_container_width=True):
+        suggested_question = f"В кои региони {sel_product} расте най-бързо и какво правим правилно там?"
+    
+    if st.button("⚔️ Как се справям срещу конкуренти?", use_container_width=True):
+        comp_text = ", ".join(competitors[:3]) if competitors else "конкуренти"
+        suggested_question = f"Как {sel_product} се справя срещу {comp_text}? Какви са силните и слабите страни?"
     
     st.divider()
     
@@ -182,7 +275,7 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
     )
     
     # Бутон за анализ
-    if st.button("🚀 Анализирай с AI", key="ai_analyze", type="primary", use_container_width=True):
+    if st.button("🚀 Анализирай с AI + Code", key="ai_analyze", type="primary", use_container_width=True):
         if not ai_question or not ai_question.strip():
             st.warning("Въведи въпрос.")
             return
@@ -200,11 +293,46 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
             )
             return
         
-        # Изграждане на контекст и извикване на AI
-        with st.spinner("Анализираме..."):
-            data_context = build_data_context(df, sel_product, competitors)
-            answer = get_ai_analysis(ai_question, data_context)
+        # AI Code Execution Analysis
+        with st.spinner("🤖 AI пише Python код..."):
+            result = execute_ai_code_analysis(
+                question=ai_question,
+                product_name=sel_product,
+                master_data_path=master_data_path
+            )
+        
+        # Показване на резултатите (Mobile-friendly)
+        if result['success']:
+            st.success("✅ Анализът завърши успешно!")
             
-            if answer:
-                st.markdown("### Резултат")
-                st.markdown(answer)
+            # 1. ТЕКСТОВ РЕЗУЛТАТ (Mobile-friendly container)
+            st.markdown("### 📊 Отговор:")
+            with st.container():
+                if result['result']:
+                    st.markdown(f"**{result['result']}**")
+                
+                if result['output']:
+                    with st.expander("📝 Детайли от анализа"):
+                        st.text(result['output'])
+            
+            # 2. ВИЗУАЛИЗАЦИЯ (Mobile-optimized)
+            if result['figure']:
+                st.markdown("### 📈 Визуализация:")
+                # Mobile-friendly chart display
+                st.plotly_chart(
+                    result['figure'],
+                    use_container_width=True,
+                    config={'displayModeBar': False}  # Скрива toolbar за mobile
+                )
+            
+            # 3. ГЕНЕРИРАН КОД (Debug)
+            with st.expander("🔍 Виж генерирания Python код"):
+                st.code(result['code'], language='python')
+        
+        else:
+            st.error("❌ Грешка при изпълнение на анализа")
+            st.error(result['error'])
+            
+            if result['code']:
+                with st.expander("🔍 Виж генерирания код (с грешка)"):
+                    st.code(result['code'], language='python')
