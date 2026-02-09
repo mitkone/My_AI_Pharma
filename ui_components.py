@@ -956,3 +956,89 @@ def create_brick_charts(
         font=dict(size=12),
     )
     st.plotly_chart(fig_geo, use_container_width=True, config=config.PLOTLY_CONFIG)
+
+
+def render_last_vs_previous_quarter(
+    df: pd.DataFrame,
+    period_col: str = "Quarter",
+) -> None:
+    """
+    Анализ: Последно vs Предишно тримесечие – % ръст по регион (Units).
+    Показва лидерборд, bar chart (зелено/червено) и топ регион в st.success.
+    """
+    from data_processing import get_sorted_periods
+    import plotly.graph_objects as go
+
+    if df.empty or "Region" not in df.columns or "Units" not in df.columns or period_col not in df.columns:
+        st.warning("Няма достатъчно данни за анализ (Region, Units, Period).")
+        return
+
+    periods = get_sorted_periods(df, period_col=period_col)
+    if len(periods) < 2:
+        st.warning("Нужни са поне два периода за сравнение.")
+        return
+
+    last_period = periods[-1]
+    prev_period = periods[-2]
+
+    # Агрегация: сума Units по Region за всеки от двата периода
+    last_df = df[df[period_col] == last_period].groupby("Region", as_index=False)["Units"].sum()
+    last_df = last_df.rename(columns={"Units": "Last_Units"})
+    prev_df = df[df[period_col] == prev_period].groupby("Region", as_index=False)["Units"].sum()
+    prev_df = prev_df.rename(columns={"Units": "Previous_Units"})
+
+    merged = last_df.merge(prev_df, on="Region", how="outer").fillna(0)
+    # Избягване на деление на нула: ако Previous_Units == 0, задаваме growth като None или 100/0 логика
+    def safe_pct_growth(row):
+        prev = row["Previous_Units"]
+        curr = row["Last_Units"]
+        if prev == 0:
+            return 100.0 if curr > 0 else 0.0  # само текущи продажби → 100%; и двете 0 → 0%
+        return ((curr - prev) / prev) * 100
+
+    merged["Growth_%"] = merged.apply(safe_pct_growth, axis=1)
+    merged = merged.sort_values("Growth_%", ascending=False).reset_index(drop=True)
+    merged["Rank"] = range(1, len(merged) + 1)
+
+    # Топ изпълнител
+    top_region = merged.iloc[0]["Region"] if len(merged) > 0 else None
+    top_growth = merged.iloc[0]["Growth_%"] if len(merged) > 0 else None
+
+    st.subheader("📊 Последно vs Предишно тримесечие")
+    st.caption(f"**Периоди:** {last_period} (текущ) vs {prev_period} (предишен) | Ръст на сумарни Units по регион.")
+
+    if top_region is not None and top_growth is not None:
+        st.success(f"🏆 **Топ регион по % ръст:** **{top_region}** ({top_growth:+.1f}%)")
+
+    # Лидерборд (таблица)
+    st.markdown("#### 🏅 Лидерборд по региони")
+    display_cols = ["Rank", "Region", "Last_Units", "Previous_Units", "Growth_%"]
+    merged_display = merged[display_cols].copy()
+    merged_display["Last_Units"] = merged_display["Last_Units"].astype(int)
+    merged_display["Previous_Units"] = merged_display["Previous_Units"].astype(int)
+    merged_display["Growth_%"] = merged_display["Growth_%"].round(1)
+    st.dataframe(merged_display, use_container_width=True, hide_index=True)
+
+    # Bar chart: зелено за положителен ръст, червено за отрицателен
+    st.markdown("#### 📈 Ръст % по регион")
+    colors = ["#2ecc71" if x >= 0 else "#e74c3c" for x in merged["Growth_%"]]
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=merged["Growth_%"],
+        y=merged["Region"],
+        orientation="h",
+        marker_color=colors,
+        text=[f"{x:+.1f}%" for x in merged["Growth_%"]],
+        textposition="outside",
+        textfont=dict(size=11),
+    ))
+    fig.add_vline(x=0, line_dash="dash", line_color="gray", line_width=1)
+    fig.update_layout(
+        xaxis_title="Ръст (%)",
+        yaxis_title="Регион",
+        height=max(400, len(merged) * 28),
+        margin=dict(l=80, r=80, t=20, b=40),
+        showlegend=False,
+        yaxis=dict(categoryorder="total descending"),
+    )
+    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)

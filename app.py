@@ -43,6 +43,7 @@ from ui_components import (
     create_brick_charts,
     show_market_share_table,
     calculate_regional_market_share,
+    render_last_vs_previous_quarter,
 )
 from ai_analysis import render_ai_analysis_tab
 from comparison_tools import create_period_comparison, create_regional_comparison
@@ -409,11 +410,12 @@ if not selected_product_data.empty and len(periods) >= 2:
 # ТАБОВЕ - ДИНАМИЧНИ СПОРЕД РОЛЯ
 # ============================================================================
 
-# Табове – всички потребители виждат Dashboard, Brick, Сравнение, EI и AI Analyst
-tab_timeline, tab_brick, tab_comparison, tab_ei, tab_ai = st.tabs([
+# Табове – всички потребители виждат Dashboard, Brick, Сравнение, Last vs Previous, EI и AI Analyst
+tab_timeline, tab_brick, tab_comparison, tab_quarter, tab_ei, tab_ai = st.tabs([
     "📈 Dashboard",
     "🗺️ По Brick (райони)",
     "⚖️ Сравнение",
+    "📅 Последно vs Предишно",
     "📊 Еволюционен Индекс",
     "🤖 AI Analyst"
 ])
@@ -485,7 +487,12 @@ with tab_comparison:
         )
 
 
-# --- ТАБ 4: ЕВОЛЮЦИОНЕН ИНДЕКС ---
+# --- ТАБ 4: ПОСЛЕДНО VS ПРЕДИШНО ТРИМЕСЕЧИЕ ---
+with tab_quarter:
+    render_last_vs_previous_quarter(df_raw, period_col="Quarter")
+
+
+# --- ТАБ 5: ЕВОЛЮЦИОНЕН ИНДЕКС ---
 with tab_ei:
     render_evolution_index_tab(
         df_filtered=df_filtered,
@@ -496,7 +503,7 @@ with tab_ei:
     )
 
 
-# --- ТАБ 5: AI ANALYST ---
+# --- ТАБ 6: AI ANALYST ---
 with tab_ai:
     render_ai_analysis_tab(
         df=df_filtered,
