@@ -1029,16 +1029,17 @@ def render_last_vs_previous_quarter(
     merged_display["Growth_%"] = merged_display["Growth_%"].round(1)
     st.dataframe(merged_display, use_container_width=True, hide_index=True)
 
-    # Bar chart: зелено за положителен ръст, червено за отрицателен
+    # Bar chart: от най-голям % ръст (отгоре) към най-малък (долу); зелено/червено
     st.markdown("#### 📈 Ръст % по регион")
-    colors = ["#2ecc71" if x >= 0 else "#e74c3c" for x in merged["Growth_%"]]
+    merged_chart = merged.sort_values("Growth_%", ascending=True)  # за графиката: долу най-нисък, отгоре най-висок
+    colors = ["#2ecc71" if x >= 0 else "#e74c3c" for x in merged_chart["Growth_%"]]
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        x=merged["Growth_%"],
-        y=merged["Region"],
+        x=merged_chart["Growth_%"],
+        y=merged_chart["Region"],
         orientation="h",
         marker_color=colors,
-        text=[f"{x:+.1f}%" for x in merged["Growth_%"]],
+        text=[f"{x:+.1f}%" for x in merged_chart["Growth_%"]],
         textposition="outside",
         textfont=dict(size=11),
     ))
@@ -1046,9 +1047,9 @@ def render_last_vs_previous_quarter(
     fig.update_layout(
         xaxis_title="Ръст (%)",
         yaxis_title="Регион",
-        height=max(400, len(merged) * 28),
+        height=max(400, len(merged_chart) * 28),
         margin=dict(l=80, r=80, t=20, b=40),
         showlegend=False,
-        yaxis=dict(categoryorder="total descending"),
+        yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist()),  # долу най-нисък, отгоре най-висок ръст
     )
     st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
