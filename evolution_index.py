@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from typing import Optional, Tuple, List, Dict, Any
 
 
+@st.cache_data(show_spinner=False)
 def _is_atc_class(drug_name) -> bool:
     """Проверява дали е ATC клас (напр. C10A1 STATINS)."""
     if pd.isna(drug_name):
@@ -30,6 +31,7 @@ def _is_atc_class(drug_name) -> bool:
     )
 
 
+@st.cache_data(show_spinner=False)
 def _calc_evolution_index(
     df: pd.DataFrame,
     drug: str,
@@ -46,15 +48,16 @@ def _calc_evolution_index(
     if "Source" not in df.columns:
         return None
     
-    sales_ref = df[(df["Drug_Name"] == drug) & (df[period_col] == ref_period)]["Units"].sum()
-    sales_base = df[(df["Drug_Name"] == drug) & (df[period_col] == base_period)]["Units"].sum()
+    product_df = df[df["Drug_Name"] == drug]
+    sales_ref = product_df[product_df[period_col] == ref_period]["Units"].sum()
+    sales_base = product_df[product_df[period_col] == base_period]["Units"].sum()
     
     if sales_base == 0:
         growth_pct = 0.0 if sales_ref == 0 else 100.0
     else:
         growth_pct = ((sales_ref - sales_base) / sales_base) * 100
     
-    product_source = df[df["Drug_Name"] == drug]["Source"].iloc[0] if len(df[df["Drug_Name"] == drug]) > 0 else None
+    product_source = product_df["Source"].iloc[0] if len(product_df) > 0 else None
     if not product_source:
         return {"sales_ref": sales_ref, "sales_base": sales_base, "growth_pct": growth_pct, "class_growth_pct": None, "ei": None, "class_name": None}
     
@@ -242,30 +245,37 @@ def render_evolution_index_tab(
         st.markdown("---")
         st.markdown("### 📊 EI по регион (бенчмарк)")
         
-        colors = ["#2ecc71" if v >= 100 else "#e74c3c" for v in values]
-        
-        fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=values,
-            y=labels,
-            orientation='h',
-            marker_color=colors,
-            text=[f"{v:.1f}" for v in values],
-            textposition='outside',
-            textfont=dict(size=11),
-        ))
-        fig.add_vline(x=100, line_dash="dash", line_color="red", line_width=2)
-        fig.update_layout(
-            xaxis_title="Еволюционен Индекс (EI)",
-            yaxis_title="Регион",
-            height=800,
-            margin=dict(l=80, r=60, t=20, b=40),
-            showlegend=False,
-            xaxis=dict(zeroline=True, zerolinewidth=1),
-            yaxis=dict(tickfont=dict(size=12), categoryorder='total ascending'),
-        )
+        fig = _build_ei_region_figure(labels, values)
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
         st.caption("Графиката показва сравнително представяне на избраното портфолио по региони за избраните периоди.")
+
+
+@st.cache_resource(show_spinner=False)
+def _build_ei_region_figure(labels: List[str], values: List[float]) -> go.Figure:
+    """Създава Plotly фигура за EI по регион (скъпа за рендер)."""
+    colors = ["#2ecc71" if v >= 100 else "#e74c3c" for v in values]
+    
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=values,
+        y=labels,
+        orientation='h',
+        marker_color=colors,
+        text=[f"{v:.1f}" for v in values],
+        textposition='outside',
+        textfont=dict(size=11),
+    ))
+    fig.add_vline(x=100, line_dash="dash", line_color="red", line_width=2)
+    fig.update_layout(
+        xaxis_title="Еволюционен Индекс (EI)",
+        yaxis_title="Регион",
+        height=800,
+        margin=dict(l=80, r=60, t=20, b=40),
+        showlegend=False,
+        xaxis=dict(zeroline=True, zerolinewidth=1),
+        yaxis=dict(tickfont=dict(size=12), categoryorder='total ascending'),
+    )
+    return fig
     
     # Таблица: Drug Name | Sales (Ref) | Sales (Base) | Growth % | Class Growth % | EI
     st.markdown("---")

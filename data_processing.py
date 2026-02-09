@@ -11,6 +11,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Optional, Tuple
 import logging
+import streamlit as st
 
 from process_excel_hierarchy import process_pharma_excel
 from drug_molecules import add_molecule_column
@@ -143,6 +144,7 @@ def load_single_excel(filepath: Path) -> Optional[pd.DataFrame]:
         return None
 
 
+@st.cache_data(show_spinner=False)
 def load_all_excel_files(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
     """
     Зарежда всички Excel файлове от директория и ги обединява.
@@ -222,6 +224,7 @@ def load_all_excel_files(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
     return combined
 
 
+@st.cache_data(show_spinner=False)
 def prepare_data_for_display(df: pd.DataFrame) -> pd.DataFrame:
     """
     Подготвя данните за визуализация:

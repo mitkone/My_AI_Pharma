@@ -22,6 +22,11 @@ except ImportError:
 import streamlit as st
 import pandas as pd
 
+try:
+    from st_keyup import st_keyup
+except ImportError:
+    st_keyup = None  # fallback: ще използваме st.text_input
+
 # Локални модули
 import config
 from data_processing import (
@@ -197,30 +202,38 @@ _all_drugs = sorted([
 ])
 
 st.markdown("### 🔍 Търсене на медикамент")
-drug_filter = st.text_input(
-    "Start typing drug name (e.g., Lip...)",
-    placeholder="e.g., Lip...",
-    key="drug_search_filter",
-    help="Почни да пишеш – ще се появят предложения; избери един от тях.",
-)
+# Поле за търсене: при всяко натискане се обновява (без Enter), ако е инсталиран streamlit-keyup
+if st_keyup:
+    drug_filter = st_keyup(
+        "Пиши име на медикамент",
+        placeholder="напр. Lip, Crestor...",
+        key="drug_search_filter",
+        debounce=150,
+    )
+else:
+    drug_filter = st.text_input(
+        "Пиши име на медикамент",
+        placeholder="напр. Lip, Crestor... (натисни Enter за предложения)",
+        key="drug_search_filter",
+        help="Почни да пишеш – ще се появят предложения; избери с клик.",
+    )
 _filter = (drug_filter or "").strip().lower()
 filtered_drugs = [d for d in _all_drugs if _filter in (d or "").lower()] if _filter else []
 
-# Предложенията се показват веднага щом има въведен текст; избор с един клик (без default)
-selected_drug = ""
-if _filter:
-    st.caption("Предложения (кликни за избор):")
-    options = (["— Избери —"] + filtered_drugs) if filtered_drugs else ["(няма съвпадения)"]
-    chosen = st.radio(
-        "Предложения",
-        options=options,
-        key="drug_suggest_radio",
-        label_visibility="collapsed",
-    )
-    if chosen and chosen not in ("— Избери —", "(няма съвпадения)"):
-        selected_drug = chosen
-        st.session_state["quick_search_drug"] = chosen
-else:
+# Избран медикамент: от сесия (след клик) или от текущ избор
+selected_drug = st.session_state.get("quick_search_drug", "")
+if _filter and not selected_drug:
+    if filtered_drugs:
+        st.caption("Избери медикамент с клик:")
+        cols = st.columns(2)
+        for i, drug in enumerate(filtered_drugs[:24]):
+            with cols[i % 2]:
+                if st.button(drug, key=f"qs_drug_{drug}", use_container_width=True):
+                    st.session_state["quick_search_drug"] = drug
+                    st.rerun()
+    else:
+        st.caption("Няма съвпадения – опитай друго име")
+elif not _filter:
     if "quick_search_drug" in st.session_state:
         del st.session_state["quick_search_drug"]
 

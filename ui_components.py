@@ -275,6 +275,7 @@ def create_metric_selector() -> Tuple[str, bool]:
     return "Units (опак.)", False
 
 
+@st.cache_data(show_spinner=False)
 def calculate_metric_data(
     df: pd.DataFrame,
     products_list: List[str],
@@ -615,6 +616,7 @@ def create_timeline_chart(
     return df_agg
 
 
+@st.cache_data(show_spinner=False)
 def calculate_regional_market_share(
     df: pd.DataFrame,
     products_list: List[str],
