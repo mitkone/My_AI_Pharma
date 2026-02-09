@@ -489,7 +489,7 @@ with tab_comparison:
 
 # --- ТАБ 4: ПОСЛЕДНО VS ПРЕДИШНО ТРИМЕСЕЧИЕ ---
 with tab_quarter:
-    render_last_vs_previous_quarter(df_raw, period_col="Quarter")
+    render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
 
 
 # --- ТАБ 5: ЕВОЛЮЦИОНЕН ИНДЕКС ---

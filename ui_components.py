@@ -960,17 +960,27 @@ def create_brick_charts(
 
 def render_last_vs_previous_quarter(
     df: pd.DataFrame,
+    selected_product: str,
     period_col: str = "Quarter",
 ) -> None:
     """
-    Анализ: Последно vs Предишно тримесечие – % ръст по регион (Units).
-    Показва лидерборд, bar chart (зелено/червено) и топ регион в st.success.
+    Анализ: Последно vs Предишно тримесечие – % ръст по регион само за избрания продукт.
+    Сравнява продажбите на selected_product (напр. Lipocante) за последното срещу предпоследното тримесечие по региони.
     """
     from data_processing import get_sorted_periods
     import plotly.graph_objects as go
 
     if df.empty or "Region" not in df.columns or "Units" not in df.columns or period_col not in df.columns:
         st.warning("Няма достатъчно данни за анализ (Region, Units, Period).")
+        return
+    if "Drug_Name" not in df.columns or not selected_product:
+        st.warning("Избери медикамент от филтрите (основен продукт).")
+        return
+
+    # Само продажби на избрания продукт (напр. Lipocante)
+    df = df[df["Drug_Name"] == selected_product].copy()
+    if df.empty:
+        st.warning(f"Няма данни за продукт **{selected_product}**.")
         return
 
     periods = get_sorted_periods(df, period_col=period_col)
@@ -1005,7 +1015,7 @@ def render_last_vs_previous_quarter(
     top_growth = merged.iloc[0]["Growth_%"] if len(merged) > 0 else None
 
     st.subheader("📊 Последно vs Предишно тримесечие")
-    st.caption(f"**Периоди:** {last_period} (текущ) vs {prev_period} (предишен) | Ръст на сумарни Units по регион.")
+    st.caption(f"**Продукт:** {selected_product} | **Периоди:** {last_period} (текущ) vs {prev_period} (предишен) | Ръст на продажби (Units) по регион.")
 
     if top_region is not None and top_growth is not None:
         st.success(f"🏆 **Топ регион по % ръст:** **{top_region}** ({top_growth:+.1f}%)")
