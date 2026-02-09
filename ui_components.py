@@ -47,21 +47,45 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
         key="sb_region",
     )
     
-    # 2. Медикамент (основен продукт) - с поддръжка за Quick Search default
-    product_index = 0
-    if default_product and default_product in drugs:
-        try:
-            product_index = drugs.index(default_product)
-        except ValueError:
-            product_index = 0
+    # 2. Медикамент (основен продукт) – търсене с предложения, избор с клик (без Enter)
+    if "sb_product" not in st.session_state:
+        st.session_state["sb_product"] = default_product if (default_product and default_product in drugs) else (drugs[0] if drugs else "")
+    if default_product and default_product in drugs and st.session_state.get("quick_search_drug") == default_product:
+        st.session_state["sb_product"] = default_product
+        st.session_state["sb_product_search"] = default_product
     
-    sel_product = st.sidebar.selectbox(
+    search_key = "sb_product_search"
+    current_selected = st.session_state["sb_product"]
+    search_placeholder = current_selected or "Пиши име на медикамент..."
+    search_val = st.sidebar.text_input(
         "2. Медикамент (основен)",
-        drugs,
-        index=product_index,
-        help="Твоят продукт за анализ (автоматично избран от Quick Search)",
-        key="sb_product",
+        value=st.session_state.get(search_key, current_selected),
+        placeholder=search_placeholder,
+        help="Пиши за търсене – избираш с клик върху предложение (не е нужен Enter)",
+        key=search_key,
     )
+    st.session_state[search_key] = search_val
+    search_term = (search_val or "").strip().lower()
+    
+    if search_term:
+        matched = [d for d in drugs if search_term in d.lower()][:20]
+        if matched:
+            st.sidebar.caption("Избери с клик:")
+            cols = st.sidebar.columns(2)
+            for i, drug in enumerate(matched):
+                with cols[i % 2]:
+                    if st.button(drug, key=f"sb_drug_btn_{drug}", use_container_width=True):
+                        st.session_state["sb_product"] = drug
+                        st.session_state[search_key] = drug
+                        if "quick_search_drug" in st.session_state:
+                            del st.session_state["quick_search_drug"]
+                        st.rerun()
+        else:
+            st.sidebar.caption("Няма съвпадения – опитай друго име")
+    else:
+        st.sidebar.caption("Пиши поне 1 символ за предложения")
+    
+    sel_product = st.session_state["sb_product"]
     
     # 3. Brick (район)
     sel_district = st.sidebar.selectbox(

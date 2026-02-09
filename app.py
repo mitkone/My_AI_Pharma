@@ -255,7 +255,7 @@ st.markdown("---")
 st.sidebar.header("📊 Филтри")
 
 # Reset All Filters бутон
-FILTER_KEYS = ["sb_region", "sb_product", "sb_district", "sb_competitors", "quick_search_drug", "drug_search_filter", "drug_suggest_radio"]
+FILTER_KEYS = ["sb_region", "sb_product", "sb_product_search", "sb_district", "sb_competitors", "quick_search_drug", "drug_search_filter", "drug_suggest_radio"]
 with st.sidebar.container():
     if st.button("🔄 Изчисти всички филтри", use_container_width=True, type="secondary", key="reset_filters_btn"):
         for k in FILTER_KEYS:
