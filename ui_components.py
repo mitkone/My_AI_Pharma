@@ -57,14 +57,15 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
     search_key = "sb_product_search"
     current_selected = st.session_state["sb_product"]
     search_placeholder = current_selected or "Пиши име на медикамент..."
+    # Инициализация само при първо зареждане (виджетът с key= управлява стойността си)
+    if search_key not in st.session_state:
+        st.session_state[search_key] = current_selected or ""
     search_val = st.sidebar.text_input(
         "2. Медикамент (основен)",
-        value=st.session_state.get(search_key, current_selected),
         placeholder=search_placeholder,
         help="Пиши за търсене – избираш с клик върху предложение (не е нужен Enter)",
         key=search_key,
     )
-    st.session_state[search_key] = search_val
     search_term = (search_val or "").strip().lower()
     
     if search_term:
