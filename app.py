@@ -223,7 +223,8 @@ filtered_drugs = [d for d in _all_drugs if _filter in (d or "").lower()] if _fil
 
 # Избран медикамент: от сесия (след клик) или от текущ избор
 selected_drug = st.session_state.get("quick_search_drug", "")
-if _filter and not selected_drug:
+# Предложенията се показват винаги при въведен текст – и при смяна на медикамент (без да се изчистват филтрите)
+if _filter:
     if filtered_drugs:
         st.caption("Избери медикамент с клик:")
         cols = st.columns(2)

@@ -1050,6 +1050,7 @@ def render_last_vs_previous_quarter(
         height=max(400, len(merged_chart) * 28),
         margin=dict(l=80, r=80, t=20, b=40),
         showlegend=False,
+        dragmode=False,
         yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist()),  # долу най-нисък, отгоре най-висок ръст
     )
     st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)

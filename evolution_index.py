@@ -9,6 +9,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from typing import Optional, Tuple, List, Dict, Any
+import config
 
 
 def _is_atc_class(drug_name) -> bool:
@@ -153,11 +154,15 @@ def render_evolution_index_tab(
         st.warning("Няма налични периоди за анализ.")
         return
     
+    # По подразбиране: медикаментът от търсачката (филтрите), ако е в списъка
+    selected_product = filters.get("product") or ""
+    default_drugs = [selected_product] if selected_product in drugs_for_select else ([drugs_for_select[0]] if drugs_for_select else [])
+    
     # Multi-select за портфолио
     sel_drugs = st.multiselect(
         "Избери медикаменти (портфолио)",
         drugs_for_select,
-        default=[drugs_for_select[0]] if drugs_for_select else [],
+        default=default_drugs,
         key="ei_drugs",
     )
     
@@ -245,7 +250,7 @@ def render_evolution_index_tab(
         st.markdown("### 📊 EI по регион (бенчмарк)")
         
         fig = _build_ei_region_figure(tuple(labels), tuple(values))
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
+        st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
         st.caption("Графиката показва сравнително представяне на избраното портфолио по региони за избраните периоди.")
 
     # Таблица: Резултати по медикамент
@@ -298,6 +303,7 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...]) 
         height=800,
         margin=dict(l=80, r=60, t=20, b=40),
         showlegend=False,
+        dragmode=False,
         xaxis=dict(zeroline=True, zerolinewidth=1),
         yaxis=dict(tickfont=dict(size=12), categoryorder='total ascending'),
     )
