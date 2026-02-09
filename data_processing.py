@@ -330,3 +330,13 @@ def get_sorted_periods(df: pd.DataFrame, period_col: str = "Quarter") -> List[st
     
     unique_periods = df[period_col].unique()
     return sorted(unique_periods, key=get_period_sort_key)
+
+
+@st.cache_data(ttl=config.CACHE_TTL, show_spinner=False)
+def load_data(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
+    """
+    Единна точка за зареждане на данни: четене на файлове + подготовка за визуализация.
+    DataFrame се зарежда веднъж и се подава по референция към останалите модули.
+    """
+    df = load_all_excel_files(data_dir)
+    return prepare_data_for_display(df)

@@ -8,7 +8,7 @@ EI > 100 означава, че продуктът расте по-бързо о
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from typing import Optional, Tuple, List, Dict, Any
+from typing import Tuple, List, Dict, Any
 import config
 
 
@@ -29,63 +29,6 @@ def _is_atc_class(drug_name) -> bool:
         and drug_name not in ["GRAND TOTAL", "Grand Total"]
         and not str(drug_name).startswith("Region")
     )
-
-
-@st.cache_data(show_spinner=False)
-def _calc_evolution_index(
-    df: pd.DataFrame,
-    drug: str,
-    ref_period: str,
-    base_period: str,
-    period_col: str = "Quarter",
-) -> Optional[Dict[str, Any]]:
-    """
-    Изчислява EI за даден медикамент между два периода.
-    
-    Връща dict: sales_ref, sales_base, growth_pct, class_growth_pct, ei, class_name
-    или None ако няма данни.
-    """
-    if "Source" not in df.columns:
-        return None
-    
-    product_df = df[df["Drug_Name"] == drug]
-    sales_ref = product_df[product_df[period_col] == ref_period]["Units"].sum()
-    sales_base = product_df[product_df[period_col] == base_period]["Units"].sum()
-    
-    if sales_base == 0:
-        growth_pct = 0.0 if sales_ref == 0 else 100.0
-    else:
-        growth_pct = ((sales_ref - sales_base) / sales_base) * 100
-    
-    product_source = product_df["Source"].iloc[0] if len(product_df) > 0 else None
-    if not product_source:
-        return {"sales_ref": sales_ref, "sales_base": sales_base, "growth_pct": growth_pct, "class_growth_pct": None, "ei": None, "class_name": None}
-    
-    df_classes = df[df["Drug_Name"].apply(_is_atc_class)].copy()
-    matching_classes = df_classes[df_classes["Source"] == product_source]["Drug_Name"].unique()
-    
-    if len(matching_classes) == 0:
-        return {"sales_ref": sales_ref, "sales_base": sales_base, "growth_pct": growth_pct, "class_growth_pct": None, "ei": None, "class_name": None}
-    
-    class_name = matching_classes[0]
-    class_ref = df[(df["Drug_Name"] == class_name) & (df[period_col] == ref_period)]["Units"].sum()
-    class_base = df[(df["Drug_Name"] == class_name) & (df[period_col] == base_period)]["Units"].sum()
-    
-    if class_base == 0:
-        class_growth_pct = 0.0 if class_ref == 0 else 100.0
-    else:
-        class_growth_pct = ((class_ref - class_base) / class_base) * 100
-    
-    ei = ((100 + growth_pct) / (100 + class_growth_pct)) * 100
-    
-    return {
-        "sales_ref": sales_ref,
-        "sales_base": sales_base,
-        "growth_pct": growth_pct,
-        "class_growth_pct": class_growth_pct,
-        "ei": ei,
-        "class_name": class_name,
-    }
 
 
 def _get_location_label(filters: dict) -> str:
@@ -181,38 +124,14 @@ def render_evolution_index_tab(
     if not sel_drugs:
         st.info("Избери поне един медикамент.")
         return
-    
-    # Изчисляване за всеки лекарствен продукт
-    rows: List[Dict[str, Any]] = []
-    total_sales_ref = 0.0
-    weighted_ei_sum = 0.0
-    
-    for drug in sel_drugs:
-        result = _calc_evolution_index(df, drug, ref_period, base_period, period_col)
-        if result and result["ei"] is not None:
-            rows.append({
-                "drug": drug,
-                "sales_ref": result["sales_ref"],
-                "sales_base": result["sales_base"],
-                "growth_pct": result["growth_pct"],
-                "class_growth_pct": result["class_growth_pct"],
-                "ei": result["ei"],
-            })
-            total_sales_ref += result["sales_ref"]
-            weighted_ei_sum += result["ei"] * result["sales_ref"]
-        else:
-            rows.append({
-                "drug": drug,
-                "sales_ref": result["sales_ref"] if result else 0,
-                "sales_base": result["sales_base"] if result else 0,
-                "growth_pct": result["growth_pct"] if result else None,
-                "class_growth_pct": result["class_growth_pct"] if result else None,
-                "ei": None,
-            })
-    
-    # Общ EI – претеглена средна по продажби (референтен период)
-    overall_ei = (weighted_ei_sum / total_sales_ref) if total_sales_ref > 0 else None
-    
+
+    from logic import compute_ei_rows_and_overall, compute_region_ei_benchmark
+
+    rows, overall_ei = compute_ei_rows_and_overall(
+        df, tuple(sel_drugs), ref_period, base_period, period_col
+    )
+    total_sales_ref = sum(r["sales_ref"] for r in rows)
+
     # Голяма метрика – Общ Еволюционен Индекс, контекстуален за локация
     drugs_display = ", ".join(sel_drugs) if len(sel_drugs) <= 3 else f"{len(sel_drugs)} медикамента"
     st.markdown("---")
@@ -226,25 +145,13 @@ def render_evolution_index_tab(
         f"Претеглено по продажби в {location_label} (референтен период)."
     )
     
-    # Regional Benchmark Chart – EI по регион (само Region, без Brick)
-    regions = sorted(df_national["Region"].unique())
-    region_ei_data: List[Tuple[str, float]] = []
-    for region in regions:
-        df_region = df_national[df_national["Region"] == region]
-        w_sum = 0.0
-        ei_weighted = 0.0
-        for drug in sel_drugs:
-            res = _calc_evolution_index(df_region, drug, ref_period, base_period, period_col)
-            if res and res["ei"] is not None and res["sales_ref"] > 0:
-                ei_weighted += res["ei"] * res["sales_ref"]
-                w_sum += res["sales_ref"]
-        if w_sum > 0:
-            region_ei_data.append((region, ei_weighted / w_sum))
-    
-    region_ei_data.sort(key=lambda x: x[1], reverse=True)  # highest EI first
+    # Regional Benchmark Chart – EI по регион
+    region_ei_data = compute_region_ei_benchmark(
+        df_national, tuple(sel_drugs), ref_period, base_period, period_col
+    )
     labels = [r[0] for r in region_ei_data]
     values = [r[1] for r in region_ei_data]
-    
+
     if region_ei_data:
         st.markdown("---")
         st.markdown("### 📊 EI по регион (бенчмарк)")

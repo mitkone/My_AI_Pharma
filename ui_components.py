@@ -186,11 +186,15 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
         df_filtered_for_top3 = df_filtered_for_top3[df_filtered_for_top3["District"] == sel_district]
     
     if add_top3:
-        # Top 3 конкуренти по Units за избрания Region/Brick (без наш продукт, без ATC класове)
-        drugs_from_class = [d for d in competitor_drugs]
-        if drugs_from_class:
-            sales_in_region = df_filtered_for_top3[df_filtered_for_top3["Drug_Name"].isin(drugs_from_class)].groupby("Drug_Name")["Units"].sum()
-            top3_drugs = sales_in_region.sort_values(ascending=False).head(3).index.tolist()
+        from logic import compute_top3_drugs
+        top3_drugs = compute_top3_drugs(
+            df_filtered_for_top3,
+            sel_region,
+            sel_district,
+            has_district,
+            tuple(competitor_drugs),
+        )
+        if top3_drugs:
             opt_to_drug = {}
             for opt in competitor_options:
                 if not opt.startswith("📊 КЛАС:"):
@@ -963,64 +967,35 @@ def render_last_vs_previous_quarter(
     selected_product: str,
     period_col: str = "Quarter",
 ) -> None:
-    """
-    Анализ: Последно vs Предишно тримесечие – % ръст по регион само за избрания продукт.
-    Сравнява продажбите на selected_product (напр. Lipocante) за последното срещу предпоследното тримесечие по региони.
-    """
+    """Рендира таб Последно vs Предишно: използва logic слой за изчисления, само UI тук."""
     from data_processing import get_sorted_periods
+    from logic import compute_last_vs_previous_rankings
     import plotly.graph_objects as go
 
-    if df.empty or "Region" not in df.columns or "Units" not in df.columns or period_col not in df.columns:
-        st.warning("Няма достатъчно данни за анализ (Region, Units, Period).")
-        return
-    if "Drug_Name" not in df.columns or not selected_product:
+    if df.empty or not selected_product:
         st.warning("Избери медикамент от филтрите (основен продукт).")
         return
-
-    # Само продажби на избрания продукт (напр. Lipocante)
-    df = df[df["Drug_Name"] == selected_product].copy()
-    if df.empty:
-        st.warning(f"Няма данни за продукт **{selected_product}**.")
-        return
-
     periods = get_sorted_periods(df, period_col=period_col)
     if len(periods) < 2:
         st.warning("Нужни са поне два периода за сравнение.")
         return
 
-    last_period = periods[-1]
-    prev_period = periods[-2]
+    result = compute_last_vs_previous_rankings(df, selected_product, period_col, tuple(periods))
+    if result is None:
+        st.warning(f"Няма данни за продукт **{selected_product}**.")
+        return
 
-    # Агрегация: сума Units по Region за всеки от двата периода
-    last_df = df[df[period_col] == last_period].groupby("Region", as_index=False)["Units"].sum()
-    last_df = last_df.rename(columns={"Units": "Last_Units"})
-    prev_df = df[df[period_col] == prev_period].groupby("Region", as_index=False)["Units"].sum()
-    prev_df = prev_df.rename(columns={"Units": "Previous_Units"})
-
-    merged = last_df.merge(prev_df, on="Region", how="outer").fillna(0)
-    # Избягване на деление на нула: ако Previous_Units == 0, задаваме growth като None или 100/0 логика
-    def safe_pct_growth(row):
-        prev = row["Previous_Units"]
-        curr = row["Last_Units"]
-        if prev == 0:
-            return 100.0 if curr > 0 else 0.0  # само текущи продажби → 100%; и двете 0 → 0%
-        return ((curr - prev) / prev) * 100
-
-    merged["Growth_%"] = merged.apply(safe_pct_growth, axis=1)
-    merged = merged.sort_values("Growth_%", ascending=False).reset_index(drop=True)
-    merged["Rank"] = range(1, len(merged) + 1)
-
-    # Топ изпълнител
-    top_region = merged.iloc[0]["Region"] if len(merged) > 0 else None
-    top_growth = merged.iloc[0]["Growth_%"] if len(merged) > 0 else None
+    merged = result["merged"]
+    last_period = result["last_period"]
+    prev_period = result["prev_period"]
+    top_region = result["top_region"]
+    top_growth = result["top_growth"]
 
     st.subheader("📊 Последно vs Предишно тримесечие")
     st.caption(f"**Продукт:** {selected_product} | **Периоди:** {last_period} (текущ) vs {prev_period} (предишен) | Ръст на продажби (Units) по регион.")
-
     if top_region is not None and top_growth is not None:
         st.success(f"🏆 **Топ регион по % ръст:** **{top_region}** ({top_growth:+.1f}%)")
 
-    # Лидерборд (таблица)
     st.markdown("#### 🏅 Лидерборд по региони")
     display_cols = ["Rank", "Region", "Last_Units", "Previous_Units", "Growth_%"]
     merged_display = merged[display_cols].copy()
@@ -1029,9 +1004,8 @@ def render_last_vs_previous_quarter(
     merged_display["Growth_%"] = merged_display["Growth_%"].round(1)
     st.dataframe(merged_display, use_container_width=True, hide_index=True)
 
-    # Bar chart: от най-голям % ръст (отгоре) към най-малък (долу); зелено/червено
     st.markdown("#### 📈 Ръст % по регион")
-    merged_chart = merged.sort_values("Growth_%", ascending=True)  # за графиката: долу най-нисък, отгоре най-висок
+    merged_chart = merged.sort_values("Growth_%", ascending=True)
     colors = ["#2ecc71" if x >= 0 else "#e74c3c" for x in merged_chart["Growth_%"]]
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -1051,6 +1025,6 @@ def render_last_vs_previous_quarter(
         margin=dict(l=80, r=80, t=20, b=40),
         showlegend=False,
         dragmode=False,
-        yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist()),  # долу най-нисък, отгоре най-висок ръст
+        yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist()),
     )
     st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)

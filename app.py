@@ -1,12 +1,10 @@
 """
-Pharma Data Viz - Главно Streamlit приложение (рефакторирано).
+Pharma Data Viz - Главно Streamlit приложение.
 
-Това е чисто UI приложение - цялата бизнес логика е разделена в отделни модули:
-- data_processing.py: Зареждане и обработка на данни
-- ui_components.py: UI елементи (филтри, графики)
-- ai_analysis.py: AI анализ с OpenAI
-- drug_molecules.py: Маппинг на медикаменти към молекули
-- config.py: Конфигурация
+- data_processing: load_data() зарежда данните веднъж (кеширани).
+- logic: изчисления (EI, Rankings, Top 3) – векторни операции, @st.cache_data.
+- ui_components, evolution_index, comparison_tools, ai_analysis: UI и визуализации.
+- config: конфигурация.
 """
 
 import os
@@ -29,11 +27,7 @@ except ImportError:
 
 # Локални модули
 import config
-from data_processing import (
-    load_all_excel_files,
-    prepare_data_for_display,
-    get_sorted_periods,
-)
+from data_processing import load_data, get_sorted_periods
 from ui_components import (
     create_filters,
     apply_filters,
@@ -48,20 +42,6 @@ from ui_components import (
 from ai_analysis import render_ai_analysis_tab
 from comparison_tools import create_period_comparison, create_regional_comparison
 from evolution_index import render_evolution_index_tab
-
-
-# ============================================================================
-# КЕШИРАНЕ НА ДАННИ
-# ============================================================================
-
-@st.cache_data(ttl=config.CACHE_TTL)
-def get_cached_data():
-    """
-    Зарежда и кешира данните за подобряване на производителността.
-    Кешът се обновява на всеки 5 минути (ttl=300) или при натискане на бутон.
-    """
-    df = load_all_excel_files()
-    return prepare_data_for_display(df)
 
 
 # ============================================================================
@@ -85,8 +65,8 @@ st.markdown(
     "избери медикамент от общата база"
 )
 
-# Зареждане на данни
-df_raw = get_cached_data()
+# Един път зареждане; df_raw се подава по референция към всички табове
+df_raw = load_data()
 
 # Проверка дали има данни
 if df_raw.empty:
