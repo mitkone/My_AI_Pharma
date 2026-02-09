@@ -11,7 +11,6 @@ import plotly.graph_objects as go
 from typing import Optional, Tuple, List, Dict, Any
 
 
-@st.cache_data(show_spinner=False)
 def _is_atc_class(drug_name) -> bool:
     """Проверява дали е ATC клас (напр. C10A1 STATINS)."""
     if pd.isna(drug_name):
@@ -245,13 +244,40 @@ def render_evolution_index_tab(
         st.markdown("---")
         st.markdown("### 📊 EI по регион (бенчмарк)")
         
-        fig = _build_ei_region_figure(labels, values)
+        fig = _build_ei_region_figure(tuple(labels), tuple(values))
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
         st.caption("Графиката показва сравнително представяне на избраното портфолио по региони за избраните периоди.")
 
+    # Таблица: Резултати по медикамент
+    st.markdown("---")
+    st.markdown("**Резултати по медикамент**")
+    table_data = []
+    for r in rows:
+        table_data.append({
+            "Медикамент": r["drug"],
+            "Продажби (Ref)": f"{int(r['sales_ref']):,}",
+            "Продажби (Base)": f"{int(r['sales_base']):,}",
+            "Ръст %": f"{r['growth_pct']:+.1f}%" if r["growth_pct"] is not None else "—",
+            "Ръст клас %": f"{r['class_growth_pct']:+.1f}%" if r["class_growth_pct"] is not None else "—",
+            "EI": f"{r['ei']:.1f}" if r["ei"] is not None else "—",
+        })
+    df_table = pd.DataFrame(table_data)
+    total_sales_base = sum(r["sales_base"] for r in rows)
+    total_growth = ((total_sales_ref - total_sales_base) / total_sales_base * 100) if total_sales_base > 0 else 0
+    total_row = {
+        "Медикамент": "**TOTAL**",
+        "Продажби (Ref)": f"{int(total_sales_ref):,}",
+        "Продажби (Base)": f"{int(total_sales_base):,}",
+        "Ръст %": f"{total_growth:+.1f}%",
+        "Ръст клас %": "—",
+        "EI": f"{overall_ei:.1f}" if overall_ei is not None else "—",
+    }
+    df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
+    st.dataframe(df_table, use_container_width=True, hide_index=True)
+
 
 @st.cache_resource(show_spinner=False)
-def _build_ei_region_figure(labels: List[str], values: List[float]) -> go.Figure:
+def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...]) -> go.Figure:
     """Създава Plotly фигура за EI по регион (скъпа за рендер)."""
     colors = ["#2ecc71" if v >= 100 else "#e74c3c" for v in values]
     
@@ -276,36 +302,3 @@ def _build_ei_region_figure(labels: List[str], values: List[float]) -> go.Figure
         yaxis=dict(tickfont=dict(size=12), categoryorder='total ascending'),
     )
     return fig
-    
-    # Таблица: Drug Name | Sales (Ref) | Sales (Base) | Growth % | Class Growth % | EI
-    st.markdown("---")
-    st.markdown("**Резултати по медикамент**")
-    
-    table_data = []
-    for r in rows:
-        table_data.append({
-            "Медикамент": r["drug"],
-            "Продажби (Ref)": f"{int(r['sales_ref']):,}",
-            "Продажби (Base)": f"{int(r['sales_base']):,}",
-            "Ръст %": f"{r['growth_pct']:+.1f}%" if r["growth_pct"] is not None else "—",
-            "Ръст клас %": f"{r['class_growth_pct']:+.1f}%" if r["class_growth_pct"] is not None else "—",
-            "EI": f"{r['ei']:.1f}" if r["ei"] is not None else "—",
-        })
-    
-    df_table = pd.DataFrame(table_data)
-    
-    # TOTAL ред
-    total_sales_base = sum(r["sales_base"] for r in rows)
-    total_growth = ((total_sales_ref - total_sales_base) / total_sales_base * 100) if total_sales_base > 0 else 0
-    # За класа – използваме среднопретегления class growth или просто overall EI
-    total_row = {
-        "Медикамент": "**TOTAL**",
-        "Продажби (Ref)": f"{int(total_sales_ref):,}",
-        "Продажби (Base)": f"{int(total_sales_base):,}",
-        "Ръст %": f"{total_growth:+.1f}%",
-        "Ръст клас %": "—",
-        "EI": f"{overall_ei:.1f}" if overall_ei is not None else "—",
-    }
-    df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
-    
-    st.dataframe(df_table, use_container_width=True, hide_index=True)
