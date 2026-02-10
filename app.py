@@ -8,7 +8,6 @@ Pharma Data Viz - Главно Streamlit приложение.
 """
 
 import os
-from pathlib import Path
 
 # Зареждане на .env файл за API ключове
 try:
@@ -50,7 +49,12 @@ from evolution_index import render_evolution_index_tab
 # TRACKING – лог на посещения по секции
 # ============================================================================
 
-VISIT_LOG_PATH = config.DATA_DIR / "section_visits.csv"
+VISIT_LOG_PATH = config.DATA_DIR / "visits_log.csv"
+ANALYTICS_FILES = [
+    config.DATA_DIR / "activity_log.csv",
+    VISIT_LOG_PATH,
+    config.DATA_DIR / "section_visits.csv",  # старият файл, ако съществува
+]
 
 
 def track_visit(section_name: str) -> None:
@@ -76,15 +80,36 @@ def track_visit(section_name: str) -> None:
         pass
 
 
+def reset_analytics() -> None:
+    """Изтрива файловете с аналитика (activity_log, visits_log и стария section_visits)."""
+    for path in ANALYTICS_FILES:
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:
+            # Ако не можем да изтрием, не спираме приложението
+            pass
+
+
 # ============================================================================
 # СТРАНИЦА - КОНФИГУРАЦИЯ
 # ============================================================================
 
 st.set_page_config(
-    page_title=config.PAGE_TITLE,
-    page_icon=config.PAGE_ICON,
-    layout=config.LAYOUT
+    page_title="Market Analyst AI",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
+
+hide_st_style = '''
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            '''
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -200,9 +225,9 @@ if is_admin:
                 except Exception as e:
                     st.sidebar.error(f"Грешка: {e}")
 
-    # Admin статистика: най-посещавани секции
+    # Admin статистика: System Analytics
     st.sidebar.markdown("---")
-    st.sidebar.subheader("📊 Most Visited Sections")
+    st.sidebar.subheader("📊 System Analytics")
     if VISIT_LOG_PATH.exists():
         try:
             df_visits = pd.read_csv(VISIT_LOG_PATH)
@@ -230,6 +255,18 @@ if is_admin:
             st.sidebar.caption("Грешка при четене на лог файла.")
     else:
         st.sidebar.caption("Няма записани посещения.")
+
+    # Reset Statistics
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("**Reset statistics**")
+    confirm_reset = st.sidebar.checkbox("Are you sure?", key="confirm_reset_stats")
+    if st.sidebar.button("Reset Statistics", type="primary", key="reset_stats_btn"):
+        if confirm_reset:
+            reset_analytics()
+            st.sidebar.success("Statistics have been reset successfully!")
+            st.rerun()
+        else:
+            st.sidebar.warning("Моля, отбележи „Are you sure?\" преди да нулираш статистиката.")
 
     st.sidebar.divider()
 
