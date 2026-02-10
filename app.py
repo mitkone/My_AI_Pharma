@@ -19,6 +19,8 @@ except ImportError:
 
 import streamlit as st
 import pandas as pd
+from datetime import datetime
+from pathlib import Path
 
 try:
     from st_keyup import st_keyup
@@ -42,6 +44,36 @@ from ui_components import (
 from ai_analysis import render_ai_analysis_tab
 from comparison_tools import create_period_comparison, create_regional_comparison
 from evolution_index import render_evolution_index_tab
+
+
+# ============================================================================
+# TRACKING – лог на посещения по секции
+# ============================================================================
+
+VISIT_LOG_PATH = config.DATA_DIR / "section_visits.csv"
+
+
+def track_visit(section_name: str) -> None:
+    """
+    Логва посещение на секция: (Timestamp_minute, Section_Name).
+    Използва session_state, за да не пише повече от веднъж на минута за дадена секция.
+    """
+    now_minute = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    key = f"last_visit_{section_name}"
+    if st.session_state.get(key) == now_minute:
+        return
+    st.session_state[key] = now_minute
+
+    try:
+        is_new = not VISIT_LOG_PATH.exists()
+        VISIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with VISIT_LOG_PATH.open("a", encoding="utf-8") as f:
+            if is_new:
+                f.write("timestamp,section\n")
+            f.write(f"{now_minute},{section_name}\n")
+    except Exception:
+        # Не прекъсваме приложението при грешка в логването
+        pass
 
 
 # ============================================================================
@@ -103,6 +135,9 @@ st.sidebar.divider()
 
 # ===== ADMIN PANEL (само за admin) =====
 if is_admin:
+    # Логваме влизане в Admin секцията (веднъж на минута)
+    track_visit("Admin")
+
     st.sidebar.header("⚙️ Admin Panel")
     
     # File uploader за нови Excel файлове
@@ -164,7 +199,38 @@ if is_admin:
                 
                 except Exception as e:
                     st.sidebar.error(f"Грешка: {e}")
-    
+
+    # Admin статистика: най-посещавани секции
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Most Visited Sections")
+    if VISIT_LOG_PATH.exists():
+        try:
+            df_visits = pd.read_csv(VISIT_LOG_PATH)
+            if not df_visits.empty and "section" in df_visits.columns:
+                counts = df_visits["section"].value_counts().reset_index()
+                counts.columns = ["Section", "Visits"]
+                import plotly.express as px
+                fig_admin = px.bar(
+                    counts,
+                    x="Visits",
+                    y="Section",
+                    orientation="h",
+                    title="Most Visited Sections",
+                    text="Visits",
+                )
+                fig_admin.update_layout(
+                    height=300,
+                    margin=dict(l=10, r=10, t=40, b=10),
+                    dragmode=False,
+                )
+                st.sidebar.plotly_chart(fig_admin, use_container_width=True, config=config.PLOTLY_CONFIG)
+            else:
+                st.sidebar.caption("Няма записани посещения.")
+        except Exception:
+            st.sidebar.caption("Грешка при четене на лог файла.")
+    else:
+        st.sidebar.caption("Няма записани посещения.")
+
     st.sidebar.divider()
 
 # ============================================================================
@@ -403,6 +469,7 @@ tab_timeline, tab_brick, tab_comparison, tab_quarter, tab_ei, tab_ai = st.tabs([
 
 # --- ТАБ 1: ПО ТРИМЕСЕЧИЕ ---
 with tab_timeline:
+    track_visit("Dashboard")
     # Изчисляване на метриката
     df_agg, y_col, y_label = calculate_metric_data(
         df=df_filtered,  # Филтриран по регион/brick (за графиката)
@@ -475,6 +542,7 @@ with tab_quarter:
 
 # --- ТАБ 5: ЕВОЛЮЦИОНЕН ИНДЕКС ---
 with tab_ei:
+    track_visit("Evolution Index")
     render_evolution_index_tab(
         df_filtered=df_filtered,
         df_national=df_raw,
