@@ -43,6 +43,7 @@ from ui_components import (
 from ai_analysis import render_ai_analysis_tab
 from comparison_tools import create_period_comparison, create_regional_comparison
 from evolution_index import render_evolution_index_tab
+from logic import compute_last_vs_previous_rankings, compute_ei_rows_and_overall
 
 
 # ============================================================================
@@ -89,6 +90,104 @@ def reset_analytics() -> None:
         except Exception:
             # Ако не можем да изтрием, не спираме приложението
             pass
+
+
+# ============================================================================
+# AI INSIGHTS SUMMARY – изпълнителен обзор
+# ============================================================================
+
+def display_ai_insights(
+    df_raw: pd.DataFrame,
+    df_filtered: pd.DataFrame,
+    filters: dict,
+    periods: list,
+) -> None:
+    """
+    Показва кратък AI Insights Summary за текущия продукт:
+    - най-добър регион по % ръст (Units, последно vs предишно тримесечие)
+    - най-слаб регион
+    - среден Еволюционен Индекс (EI) за продукта по текущите филтри
+    """
+    product = filters.get("product")
+    if not product or df_filtered.empty or not periods or len(periods) < 2:
+        with st.container():
+            st.info("Няма достатъчно данни за AI Insights за текущите филтри.")
+        return
+
+    # Growth % по региони за последните 2 периода
+    best_region = best_growth = worst_region = worst_growth = None
+    try:
+        last_prev = compute_last_vs_previous_rankings(
+            df_raw, product, "Quarter", tuple(periods)
+        )
+        if last_prev is not None:
+            merged = last_prev["merged"]
+            if not merged.empty:
+                # Най-добър (по-висок Growth_%)
+                best_row = merged.sort_values("Growth_%", ascending=False).iloc[0]
+                best_region = best_row["Region"]
+                best_growth = float(best_row["Growth_%"])
+                # Най-слаб
+                worst_row = merged.sort_values("Growth_%", ascending=True).iloc[0]
+                worst_region = worst_row["Region"]
+                worst_growth = float(worst_row["Growth_%"])
+    except Exception:
+        pass
+
+    # Среден EI за продукта – последно vs предишно тримесечие, по текущите филтри
+    avg_ei = None
+    try:
+        ref_period = periods[-1]
+        base_period = periods[-2]
+        rows_ei, overall_ei = compute_ei_rows_and_overall(
+            df_filtered, (product,), ref_period, base_period, "Quarter"
+        )
+        avg_ei = float(overall_ei) if overall_ei is not None else None
+    except Exception:
+        pass
+
+    # Ако нямаме нито един показател – показваме информативно съобщение
+    if best_region is None and avg_ei is None:
+        with st.container():
+            st.info("AI Insights Summary: Няма достатъчно данни за анализ за текущите филтри.")
+        return
+
+    # UI контейнер – Executive Briefing
+    with st.container():
+        st.markdown(
+            f"""
+            <div style="
+                border-radius: 10px;
+                padding: 16px 20px;
+                margin-bottom: 16px;
+                background: linear-gradient(90deg, #0f172a, #020617);
+                border: 1px solid #1f2937;
+            ">
+              <h3 style="margin: 0 0 6px 0; font-size: 18px;">
+                🧠 AI Insights Summary
+              </h3>
+              <p style="margin: 0 0 10px 0; font-size: 13px; opacity: 0.8;">
+                Executive briefing за <b>{product}</b> на база последните данни.
+              </p>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Съдържание – използваме обикновен markdown за по-лесно форматиране
+        lines = []
+        if best_region is not None:
+            lines.append(f"- **Най-добър регион (ръст Units):** {best_region} ({best_growth:+.1f}%)")
+        if worst_region is not None:
+            lines.append(f"- **Най-слаб регион (ръст Units):** {worst_region} ({worst_growth:+.1f}%)")
+        if avg_ei is not None:
+            lines.append(f"- **Среден Еволюционен Индекс (EI):** {avg_ei:.1f}")
+
+        if lines:
+            st.markdown("\n".join(lines))
+        else:
+            st.markdown("_Няма достатъчно данни за изчисляване на показателите._")
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -366,6 +465,9 @@ if "Source" in df_raw.columns:
     sources = sorted(df_raw["Source"].unique())
     st.sidebar.caption(f"Заредени: {', '.join(sources)}")
 
+# Toggle за AI Insights Summary (по подразбиране включен)
+show_insights = st.sidebar.checkbox("Show AI Insights", value=True, key="show_ai_insights")
+
 # Създаване на филтри (с default от Quick Search ако има)
 filters = create_filters(df_raw, default_product=st.session_state.get('quick_search_drug'))
 
@@ -485,8 +587,12 @@ if not selected_product_data.empty and len(periods) >= 2:
         value=f"{abs(growth_units):,}",
         delta=f"{'↑' if growth_units > 0 else '↓'} {abs(growth_pct):.1f}%"
     )
-    
-    st.markdown("---")
+
+# AI Insights Summary – само ако е включен toggle-ът
+if st.session_state.get("show_ai_insights", True):
+    display_ai_insights(df_raw, df_filtered, filters, periods)
+
+st.markdown("---")
 
 
 # ============================================================================
