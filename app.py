@@ -28,6 +28,14 @@ except ImportError:
 
 # Локални модули
 import config
+from dashboard_config import (
+    get_dashboard_config,
+    show_component_enabled,
+    DEFAULT_DASHBOARD_CONFIG,
+    COMPONENT_IDS,
+    COMPONENT_LABELS,
+    save_config_to_json,
+)
 from data_processing import load_data, get_sorted_periods
 from ui_components import (
     create_filters,
@@ -44,6 +52,12 @@ from ai_analysis import render_ai_analysis_tab
 from comparison_tools import create_period_comparison, create_regional_comparison
 from evolution_index import render_evolution_index_tab
 from logic import compute_last_vs_previous_rankings, compute_ei_rows_and_overall
+from advanced_viz import (
+    render_growth_share_bubble,
+    render_regional_waterfall,
+    render_radar_chart,
+    render_churn_alert_table,
+)
 
 
 # ============================================================================
@@ -205,6 +219,14 @@ hide_st_style = '''
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
+            .pharmalyze-card {
+                border-radius: 12px;
+                padding: 1rem 1.25rem;
+                margin-bottom: 1rem;
+                background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+                border: 1px solid #1e293b;
+                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            }
             </style>
             '''
 st.markdown(hide_st_style, unsafe_allow_html=True)
@@ -246,7 +268,7 @@ admin_password = st.sidebar.text_input(
     help="Само admin може да качва нови файлове"
 )
 
-is_admin = (admin_password == "1234")
+is_admin = (admin_password == "110215")
 
 # Показване на роля
 if is_admin:
@@ -322,6 +344,54 @@ if is_admin:
                 
                 except Exception as e:
                     st.sidebar.error(f"Грешка: {e}")
+
+    # Dashboard Configuration (Admin only)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📋 Dashboard Configuration")
+    cfg = get_dashboard_config()
+
+    st.sidebar.caption("Toggle features (apply instantly)")
+    cfg["show_performance_cards"] = st.sidebar.toggle("Show Performance Cards", value=cfg.get("show_performance_cards", True), key="cfg_perf")
+    cfg["show_ai_insights"] = st.sidebar.toggle("Show AI Insights", value=cfg.get("show_ai_insights", True), key="cfg_ai")
+    cfg["show_market_share"] = st.sidebar.toggle("Show Market Share", value=cfg.get("show_market_share", True), key="cfg_ms")
+    cfg["show_evolution_index"] = st.sidebar.toggle("Show Evolution Index", value=cfg.get("show_evolution_index", True), key="cfg_ei")
+    cfg["show_target_tracker"] = st.sidebar.toggle("Show Targets", value=cfg.get("show_target_tracker", True), key="cfg_tt")
+    st.sidebar.caption("Optional modules")
+    cfg["show_trend_analysis"] = st.sidebar.toggle("Trend Analysis Graph", value=cfg.get("show_trend_analysis", False), key="cfg_trend")
+    cfg["show_regional_ranking"] = st.sidebar.toggle("Regional Ranking Table", value=cfg.get("show_regional_ranking", False), key="cfg_reg")
+    cfg["show_product_deep_dive"] = st.sidebar.toggle("Product Deep Dive", value=cfg.get("show_product_deep_dive", False), key="cfg_pdd")
+    st.sidebar.caption("Advanced visualizations")
+    cfg["show_growth_share_bubble"] = st.sidebar.toggle("Growth-Share Bubble Matrix", value=cfg.get("show_growth_share_bubble", False), key="cfg_bubble")
+    cfg["show_regional_waterfall"] = st.sidebar.toggle("Regional Waterfall Chart", value=cfg.get("show_regional_waterfall", False), key="cfg_waterfall")
+    cfg["show_radar_chart"] = st.sidebar.toggle("Radar Chart (2 regions)", value=cfg.get("show_radar_chart", False), key="cfg_radar")
+    cfg["show_churn_alert_table"] = st.sidebar.toggle("Churn Alert Table", value=cfg.get("show_churn_alert_table", False), key="cfg_churn")
+
+    cfg["default_comparison_period"] = st.sidebar.selectbox(
+        "Default Comparison Period",
+        ["Quarter vs Quarter", "Month vs Month"],
+        index=0 if cfg.get("default_comparison_period") == "Quarter vs Quarter" else 1,
+        key="cfg_period",
+    )
+
+    order_labels = [COMPONENT_LABELS.get(cid, cid) for cid in COMPONENT_IDS]
+    current_order = cfg.get("component_order", list(COMPONENT_IDS))
+    current_order_labels = [COMPONENT_LABELS.get(cid, cid) for cid in current_order]
+    selected_order_labels = st.sidebar.multiselect(
+        "Component order (select in display order)",
+        order_labels,
+        default=current_order_labels,
+        key="cfg_order_multiselect",
+    )
+    if selected_order_labels:
+        label_to_id = {v: k for k, v in COMPONENT_LABELS.items()}
+        cfg["component_order"] = [label_to_id.get(lb, lb) for lb in selected_order_labels]
+        for cid in COMPONENT_IDS:
+            if cid not in cfg["component_order"]:
+                cfg["component_order"].append(cid)
+
+    if st.sidebar.button("💾 Save config to file", key="cfg_save_btn"):
+        save_config_to_json(cfg)
+        st.sidebar.success("Config saved.")
 
     # Admin статистика: System Analytics
     st.sidebar.markdown("---")
@@ -465,9 +535,6 @@ if "Source" in df_raw.columns:
     sources = sorted(df_raw["Source"].unique())
     st.sidebar.caption(f"Заредени: {', '.join(sources)}")
 
-# Toggle за AI Insights Summary (по подразбиране включен)
-show_insights = st.sidebar.checkbox("Show AI Insights", value=True, key="show_ai_insights")
-
 # Създаване на филтри (с default от Quick Search ако има)
 filters = create_filters(df_raw, default_product=st.session_state.get('quick_search_drug'))
 
@@ -495,207 +562,223 @@ df_chart = df_filtered[df_filtered["Drug_Name"].isin(products_on_chart)].copy()
 periods = get_sorted_periods(df_raw)
 
 # ============================================================================
-# KPI МЕТРИКИ (Mobile-First: Първото нещо което се вижда)
+# DYNAMIC DASHBOARD – настройки от Admin Panel, подредба по component_order
 # ============================================================================
 
-# Изчисляване на ключови метрики за избрания продукт
+cfg = get_dashboard_config()
 selected_product_data = df_filtered[df_filtered["Drug_Name"] == filters["product"]].copy()
 
-if not selected_product_data.empty and len(periods) >= 2:
-    # Последни 2 периода
-    last_period = periods[-1]
-    prev_period = periods[-2]
-    
-    # Units за последния период
-    last_units = selected_product_data[selected_product_data["Quarter"] == last_period]["Units"].sum()
-    prev_units = selected_product_data[selected_product_data["Quarter"] == prev_period]["Units"].sum()
-    
-    # % Ръст
-    growth_pct = ((last_units - prev_units) / prev_units * 100) if prev_units > 0 else 0
-    
-    # Market Share (само ако има Source колона)
-    market_share_pct = 0
-    if "Source" in df_raw.columns:
-        # Намираме класа за избрания продукт
-        product_source = selected_product_data["Source"].iloc[0] if len(selected_product_data) > 0 else None
-        if product_source:
-            # ATC клас проверка
-            def is_atc_class(drug_name):
-                if pd.isna(drug_name):
-                    return False
-                parts = str(drug_name).split()
-                if not parts:
-                    return False
-                first_word = parts[0]
-                return (
-                    len(first_word) >= 4 and len(first_word) <= 7 and
-                    first_word[0].isalpha() and any(c.isdigit() for c in first_word) and
-                    first_word.isupper() and len(parts) >= 2 and
-                    drug_name not in ["GRAND TOTAL", "Grand Total"] and
-                    not drug_name.startswith("Region")
-                )
-            
-            df_classes = df_raw[df_raw["Drug_Name"].apply(is_atc_class)].copy()
-            if len(df_classes) > 0:
-                matching_classes = df_classes[df_classes["Source"] == product_source]["Drug_Name"].unique()
-                if len(matching_classes) > 0:
-                    class_name = matching_classes[0]
-                    class_last = df_classes[
-                        (df_classes["Drug_Name"] == class_name) & 
-                        (df_classes["Quarter"] == last_period)
-                    ]["Units"].sum()
-                    
-                    national_product_last = df_raw[
-                        (df_raw["Drug_Name"] == filters["product"]) & 
-                        (df_raw["Quarter"] == last_period)
-                    ]["Units"].sum()
-                    
-                    market_share_pct = (national_product_last / class_last * 100) if class_last > 0 else 0
-    
-    # Брой региони с продажби
-    regions_count = selected_product_data[selected_product_data["Quarter"] == last_period]["Region"].nunique()
-    
-    # Показваме метриките (Mobile-First: вертикално)
-    st.markdown("### 📊 Ключови показатели")
-    
-    region_label = filters["region"] if filters["region"] != "Всички" else "Всички региони"
-    brick_label = filters["district"] if filters.get("district") and filters["district"] != "Всички" else "Всички Брикове"
-    st.info(f"📍 **Анализ за:** {region_label} | **Брик:** {brick_label}")
-    
-    st.metric(
-        label=f"Продажби {last_period}",
-        value=f"{int(last_units):,} опак.",
-        delta=f"{growth_pct:+.1f}%"
-    )
-    
-    st.metric(
-        label="Market Share (национално)",
-        value=f"{market_share_pct:.2f}%",
-        delta=None
-    )
-    
-    st.metric(
-        label="Активни региони",
-        value=f"{regions_count}",
-        delta=None
-    )
-    
-    # Ръст в опаковки
-    growth_units = int(last_units - prev_units)
-    st.metric(
-        label="Промяна опаковки",
-        value=f"{abs(growth_units):,}",
-        delta=f"{'↑' if growth_units > 0 else '↓'} {abs(growth_pct):.1f}%"
-    )
+# Рендиране на компоненти в избрания ред (само тези над табовете; market_share / evolution_index са в табовете)
+for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
+    if comp_id in ("market_share", "evolution_index"):
+        continue  # те са в табовете
+    if not show_component_enabled(cfg, comp_id):
+        continue
+    use_card = comp_id in ("trend_analysis", "regional_ranking", "product_deep_dive")
+    with st.container():
+        if use_card:
+            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
 
-# AI Insights Summary – само ако е включен toggle-ът
-if st.session_state.get("show_ai_insights", True):
-    display_ai_insights(df_raw, df_filtered, filters, periods)
+        if comp_id == "performance_cards":
+            if not selected_product_data.empty and len(periods) >= 2:
+                last_period = periods[-1]
+                prev_period = periods[-2]
+                last_units = selected_product_data[selected_product_data["Quarter"] == last_period]["Units"].sum()
+                prev_units = selected_product_data[selected_product_data["Quarter"] == prev_period]["Units"].sum()
+                growth_pct = ((last_units - prev_units) / prev_units * 100) if prev_units > 0 else 0
+                market_share_pct = 0
+                if "Source" in df_raw.columns:
+                    product_source = selected_product_data["Source"].iloc[0] if len(selected_product_data) > 0 else None
+                    if product_source:
+                        def is_atc_class(drug_name):
+                            if pd.isna(drug_name):
+                                return False
+                            parts = str(drug_name).split()
+                            if not parts:
+                                return False
+                            first_word = parts[0]
+                            return (
+                                len(first_word) >= 4 and len(first_word) <= 7 and
+                                first_word[0].isalpha() and any(c.isdigit() for c in first_word) and
+                                first_word.isupper() and len(parts) >= 2 and
+                                drug_name not in ["GRAND TOTAL", "Grand Total"] and
+                                not drug_name.startswith("Region")
+                            )
+                        df_classes = df_raw[df_raw["Drug_Name"].apply(is_atc_class)].copy()
+                        if len(df_classes) > 0:
+                            matching_classes = df_classes[df_classes["Source"] == product_source]["Drug_Name"].unique()
+                            if len(matching_classes) > 0:
+                                class_name = matching_classes[0]
+                                class_last = df_classes[
+                                    (df_classes["Drug_Name"] == class_name) & (df_classes["Quarter"] == last_period)
+                                ]["Units"].sum()
+                                national_product_last = df_raw[
+                                    (df_raw["Drug_Name"] == filters["product"]) & (df_raw["Quarter"] == last_period)
+                                ]["Units"].sum()
+                                market_share_pct = (national_product_last / class_last * 100) if class_last > 0 else 0
+                regions_count = selected_product_data[selected_product_data["Quarter"] == last_period]["Region"].nunique()
+                growth_units = int(last_units - prev_units)
+                st.markdown("### 📊 Ключови показатели")
+                region_label = filters["region"] if filters["region"] != "Всички" else "Всички региони"
+                brick_label = filters["district"] if filters.get("district") and filters["district"] != "Всички" else "Всички Брикове"
+                st.info(f"📍 **Анализ за:** {region_label} | **Брик:** {brick_label}")
+                st.metric(label=f"Продажби {last_period}", value=f"{int(last_units):,} опак.", delta=f"{growth_pct:+.1f}%")
+                st.metric(label="Market Share (национално)", value=f"{market_share_pct:.2f}%", delta=None)
+                st.metric(label="Активни региони", value=f"{regions_count}", delta=None)
+                st.metric(label="Промяна опаковки", value=f"{abs(growth_units):,}", delta=f"{'↑' if growth_units > 0 else '↓'} {abs(growth_pct):.1f}%")
+
+        elif comp_id == "ai_insights":
+            display_ai_insights(df_raw, df_filtered, filters, periods)
+
+        elif comp_id == "target_tracker":
+            st.markdown("### 🎯 Target Tracker")
+            if not selected_product_data.empty and len(periods) >= 2:
+                last_p = periods[-1]
+                last_u = selected_product_data[selected_product_data["Quarter"] == last_p]["Units"].sum()
+                st.metric("Текущи продажби (последен период)", f"{int(last_u):,} опак.", last_p)
+            else:
+                st.caption("Няма данни за целеви показатели.")
+
+        elif comp_id == "trend_analysis":
+            st.markdown("### 📈 Trend Analysis Graph")
+            if not df_chart.empty and len(periods) > 0:
+                try:
+                    import plotly.express as px
+                    trend_df = df_chart.groupby("Quarter", as_index=False)["Units"].sum()
+                    fig_t = px.line(trend_df, x="Quarter", y="Units", title="Тренд по периоди (избрани продукти)")
+                    fig_t.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10), dragmode=False)
+                    st.plotly_chart(fig_t, use_container_width=True, config=config.PLOTLY_CONFIG)
+                except Exception:
+                    st.caption("Недостатъчно данни за графика.")
+            else:
+                st.caption("Изберете продукт и филтри за тренд графика.")
+
+        elif comp_id == "regional_ranking":
+            st.markdown("### 🗺️ Regional Ranking Table")
+            if not df_filtered.empty and periods and "Region" in df_filtered.columns:
+                last_p = periods[-1]
+                reg = df_filtered[df_filtered["Quarter"] == last_p].groupby("Region")["Units"].sum().sort_values(ascending=False).reset_index()
+                reg.columns = ["Region", "Units"]
+                st.dataframe(reg, use_container_width=True, height=280)
+            else:
+                st.caption("Няма регионни данни за последния период.")
+
+        elif comp_id == "product_deep_dive":
+            st.markdown("### 🔬 Product Deep Dive")
+            if not df_chart.empty:
+                by_drug = df_chart.groupby("Drug_Name")["Units"].sum().sort_values(ascending=False).head(10).reset_index()
+                by_drug.columns = ["Медикамент", "Общо опаковки"]
+                st.dataframe(by_drug, use_container_width=True, height=220)
+            else:
+                st.caption("Няма данни за детайлен преглед.")
+
+        if use_card:
+            st.markdown("</div>", unsafe_allow_html=True)
+
+# ============================================================================
+# ADVANCED VISUALIZATIONS – само ако съответният toggle е True (за производителност)
+# ============================================================================
+if (
+    cfg.get("show_growth_share_bubble")
+    or cfg.get("show_regional_waterfall")
+    or cfg.get("show_radar_chart")
+    or cfg.get("show_churn_alert_table")
+):
+    st.markdown("---")
+    st.markdown("#### 📊 Advanced Visualizations")
+    if cfg.get("show_growth_share_bubble"):
+        with st.container():
+            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
+            render_growth_share_bubble(df_raw, products_on_chart, periods, "Quarter")
+            st.markdown("</div>", unsafe_allow_html=True)
+    if cfg.get("show_regional_waterfall"):
+        with st.container():
+            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
+            render_regional_waterfall(df_raw, periods, "Quarter")
+            st.markdown("</div>", unsafe_allow_html=True)
+    if cfg.get("show_radar_chart"):
+        with st.container():
+            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
+            render_radar_chart(df_raw, filters["product"], periods, "Quarter")
+            st.markdown("</div>", unsafe_allow_html=True)
+    if cfg.get("show_churn_alert_table"):
+        with st.container():
+            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
+            render_churn_alert_table(df_raw, periods, "Quarter", top_n=10)
+            st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
 
-
 # ============================================================================
-# ТАБОВЕ - ДИНАМИЧНИ СПОРЕД РОЛЯ
+# ТАБОВЕ – динамични: EI таб само ако show_evolution_index
 # ============================================================================
 
-# Табове – всички потребители виждат Dashboard, Brick, Сравнение, Last vs Previous, EI и AI Analyst
-tab_timeline, tab_brick, tab_comparison, tab_quarter, tab_ei, tab_ai = st.tabs([
-    "📈 Dashboard",
-    "🗺️ По Brick (райони)",
-    "⚖️ Сравнение",
-    "📅 Последно vs Предишно",
-    "📊 Еволюционен Индекс",
-    "🤖 AI Analyst"
-])
+tab_names = ["📈 Dashboard", "🗺️ По Brick (райони)", "⚖️ Сравнение", "📅 Последно vs Предишно"]
+if cfg.get("show_evolution_index", True):
+    tab_names.append("📊 Еволюционен Индекс")
+tab_names.append("🤖 AI Analyst")
+tab_refs = st.tabs(tab_names)
+idx = 0
 
-# --- ТАБ 1: ПО ТРИМЕСЕЧИЕ ---
-with tab_timeline:
+with tab_refs[idx]:
     track_visit("Dashboard")
-    # Изчисляване на метриката
     df_agg, y_col, y_label = calculate_metric_data(
-        df=df_filtered,  # Филтриран по регион/brick (за графиката)
-        products_list=products_on_chart,
-        periods=periods,
-        metric=metric,
-        df_full=df_raw,  # Пълен национален dataset (за Market Share)
-    )
-    
-    # Създаване на линейна графика и Market Share таблица
-    df_agg_result = create_timeline_chart(
-        df_agg=df_agg,
-        y_col=y_col,
-        y_label=y_label,
-        periods=periods,
-        sel_product=filters["product"],
-        competitors=filters["competitors"],
-    )
-    
-    # Показване на Market Share таблици под графиката
-    if df_agg_result is not None:
-        show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
-        if filters["region"] != "Всички":
-            st.markdown("---")
-            df_regional_share = calculate_regional_market_share(
-                df=df_filtered,
-                products_list=products_on_chart,
-                periods=periods,
-                period_col="Quarter"
-            )
-            if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
-                show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
-
-
-# --- ТАБ 2: ПО BRICK ---
-with tab_brick:
-    create_brick_charts(
-        df=df_raw,  # Използваме пълните данни, не филтрираните
-        products_list=products_on_chart,
-        sel_product=filters["product"],
-        competitors=filters["competitors"],
-        periods=periods,
-    )
-
-
-# --- ТАБ 3: СРАВНЕНИЕ ---
-with tab_comparison:
-    # Period comparison
-    create_period_comparison(
         df=df_filtered,
         products_list=products_on_chart,
         periods=periods,
+        metric=metric,
+        df_full=df_raw,
     )
-    
-    st.divider()
-    
-    # Regional comparison за последния период
-    if periods:
-        create_regional_comparison(
-            df=df_raw,
-            products_list=products_on_chart,
-            period=periods[-1],
-        )
+    df_agg_result = create_timeline_chart(
+        df_agg=df_agg, y_col=y_col, y_label=y_label, periods=periods,
+        sel_product=filters["product"], competitors=filters["competitors"],
+    )
+    if df_agg_result is not None:
+        if cfg.get("show_market_share", True):
+            show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
+            if filters["region"] != "Всички":
+                st.markdown("---")
+                df_regional_share = calculate_regional_market_share(
+                    df=df_filtered, products_list=products_on_chart, periods=periods, period_col="Quarter"
+                )
+                if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
+                    show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
+idx += 1
 
-
-# --- ТАБ 4: ПОСЛЕДНО VS ПРЕДИШНО ТРИМЕСЕЧИЕ ---
-with tab_quarter:
-    render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
-
-
-# --- ТАБ 5: ЕВОЛЮЦИОНЕН ИНДЕКС ---
-with tab_ei:
-    track_visit("Evolution Index")
-    render_evolution_index_tab(
-        df_filtered=df_filtered,
-        df_national=df_raw,
+with tab_refs[idx]:
+    create_brick_charts(
+        df=df_raw,
+        products_list=products_on_chart,
+        sel_product=filters["product"],
+        competitors=filters["competitors"],
         periods=periods,
-        filters=filters,
-        period_col="Quarter",
     )
+idx += 1
 
+with tab_refs[idx]:
+    create_period_comparison(df=df_filtered, products_list=products_on_chart, periods=periods)
+    st.divider()
+    if periods:
+        create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1])
+idx += 1
 
-# --- ТАБ 6: AI ANALYST ---
-with tab_ai:
+with tab_refs[idx]:
+    render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
+idx += 1
+
+if cfg.get("show_evolution_index", True):
+    with tab_refs[idx]:
+        track_visit("Evolution Index")
+        render_evolution_index_tab(
+            df_filtered=df_filtered,
+            df_national=df_raw,
+            periods=periods,
+            filters=filters,
+            period_col="Quarter",
+        )
+    idx += 1
+
+with tab_refs[idx]:
     render_ai_analysis_tab(
         df=df_filtered,
         sel_product=filters["product"],
