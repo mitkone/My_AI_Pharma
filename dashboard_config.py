@@ -49,10 +49,9 @@ DEFAULT_DASHBOARD_CONFIG: dict[str, Any] = {
     "show_regional_ranking": False,
     "show_product_deep_dive": False,
     # Advanced visualization modules (optional)
-    "show_growth_share_bubble": False,
-    "show_regional_waterfall": False,
-    "show_radar_chart": False,
     "show_churn_alert_table": False,
+    "show_growth_leaders_table": False,
+    "show_regional_growth_table": False,
     "default_comparison_period": "Quarter vs Quarter",  # or "Month vs Month"
     "component_order": list(COMPONENT_IDS),
 }

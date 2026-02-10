@@ -53,10 +53,9 @@ from comparison_tools import create_period_comparison, create_regional_compariso
 from evolution_index import render_evolution_index_tab
 from logic import compute_last_vs_previous_rankings, compute_ei_rows_and_overall
 from advanced_viz import (
-    render_growth_share_bubble,
-    render_regional_waterfall,
-    render_radar_chart,
     render_churn_alert_table,
+    render_growth_leaders_table,
+    render_regional_growth_table,
 )
 
 
@@ -361,10 +360,9 @@ if is_admin:
     cfg["show_regional_ranking"] = st.sidebar.toggle("Regional Ranking Table", value=cfg.get("show_regional_ranking", False), key="cfg_reg")
     cfg["show_product_deep_dive"] = st.sidebar.toggle("Product Deep Dive", value=cfg.get("show_product_deep_dive", False), key="cfg_pdd")
     st.sidebar.caption("Advanced visualizations")
-    cfg["show_growth_share_bubble"] = st.sidebar.toggle("Growth-Share Bubble Matrix", value=cfg.get("show_growth_share_bubble", False), key="cfg_bubble")
-    cfg["show_regional_waterfall"] = st.sidebar.toggle("Regional Waterfall Chart", value=cfg.get("show_regional_waterfall", False), key="cfg_waterfall")
-    cfg["show_radar_chart"] = st.sidebar.toggle("Radar Chart (2 regions)", value=cfg.get("show_radar_chart", False), key="cfg_radar")
     cfg["show_churn_alert_table"] = st.sidebar.toggle("Churn Alert Table", value=cfg.get("show_churn_alert_table", False), key="cfg_churn")
+    cfg["show_growth_leaders_table"] = st.sidebar.toggle("Top Growth Table", value=cfg.get("show_growth_leaders_table", False), key="cfg_growth_leaders")
+    cfg["show_regional_growth_table"] = st.sidebar.toggle("Regional Growth Table", value=cfg.get("show_regional_growth_table", False), key="cfg_reg_growth")
 
     cfg["default_comparison_period"] = st.sidebar.selectbox(
         "Default Comparison Period",
@@ -679,32 +677,26 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
 # ADVANCED VISUALIZATIONS – само ако съответният toggle е True (за производителност)
 # ============================================================================
 if (
-    cfg.get("show_growth_share_bubble")
-    or cfg.get("show_regional_waterfall")
-    or cfg.get("show_radar_chart")
-    or cfg.get("show_churn_alert_table")
+    cfg.get("show_churn_alert_table")
+    or cfg.get("show_growth_leaders_table")
+    or cfg.get("show_regional_growth_table")
 ):
     st.markdown("---")
     st.markdown("#### 📊 Advanced Visualizations")
-    if cfg.get("show_growth_share_bubble"):
-        with st.container():
-            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
-            render_growth_share_bubble(df_raw, products_on_chart, periods, "Quarter")
-            st.markdown("</div>", unsafe_allow_html=True)
-    if cfg.get("show_regional_waterfall"):
-        with st.container():
-            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
-            render_regional_waterfall(df_raw, periods, "Quarter")
-            st.markdown("</div>", unsafe_allow_html=True)
-    if cfg.get("show_radar_chart"):
-        with st.container():
-            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
-            render_radar_chart(df_raw, filters["product"], periods, "Quarter")
-            st.markdown("</div>", unsafe_allow_html=True)
     if cfg.get("show_churn_alert_table"):
         with st.container():
             st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
             render_churn_alert_table(df_raw, periods, "Quarter", top_n=10)
+            st.markdown("</div>", unsafe_allow_html=True)
+    if cfg.get("show_growth_leaders_table"):
+        with st.container():
+            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
+            render_growth_leaders_table(df_raw, periods, "Quarter", top_n=10)
+            st.markdown("</div>", unsafe_allow_html=True)
+    if cfg.get("show_regional_growth_table"):
+        with st.container():
+            st.markdown('<div class="pharmalyze-card">', unsafe_allow_html=True)
+            render_regional_growth_table(df_raw, filters["product"], periods, "Quarter")
             st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
