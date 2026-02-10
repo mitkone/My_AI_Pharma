@@ -206,10 +206,10 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
             st.rerun()
     
     help_text = "📊 Класове (общи продажби) | Медикаменти сортирани по продажби (най-много → най-малко)"
+    # Не подаваме default, за да избегнем конфликт с директно задаване на st.session_state[\"sb_competitors\"]
     competitor_products = st.sidebar.multiselect(
         "Избери конкуренти",
         competitor_options,
-        default=[],
         help=help_text,
         key="sb_competitors",
     )
