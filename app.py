@@ -446,14 +446,6 @@ if is_admin:
                                     if "Team" not in df_existing.columns:
                                         df_existing["Team"] = "Team 2"
                                     df_updated = pd.concat([df_existing, df_new], ignore_index=True)
-                            else:
-                                # Запазваме съществуващите данни от Excel, не ги губим
-                                from data_processing import load_all_excel_files
-                                df_existing = load_all_excel_files()
-                                if not df_existing.empty:
-                                    if "Team" not in df_existing.columns:
-                                        df_existing["Team"] = "Team 2"
-                                    df_updated = pd.concat([df_existing, df_new], ignore_index=True)
                                 else:
                                     df_updated = df_new
 
