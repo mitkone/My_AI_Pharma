@@ -301,6 +301,17 @@ with st.expander("🔐 Admin login"):
 
 is_admin = st.session_state.get("is_admin", False)
 
+# Скриваме sidebar за не-admin потребители (чист landing / mobile-first)
+if not is_admin:
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] { display: none; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # ===== ADMIN PANEL (само за admin, в sidebar) =====
 if is_admin:
     # Логваме влизане в Admin секцията (веднъж на минута)
@@ -558,28 +569,35 @@ if not drug_data.empty and len(periods_temp) >= 2:
 st.markdown("---")
 
 # ============================================================================
-# SIDEBAR - ФИЛТРИ (само след избор на медикамент)
+# ФИЛТРИ НА ГЛАВНАТА СТРАНИЦА (без sidebar за потребителя)
 # ============================================================================
 
-st.sidebar.header("📊 Филтри")
+st.markdown("### 🔧 Филтри за анализ")
 
-# Reset All Filters бутон
-FILTER_KEYS = ["sb_region", "sb_product", "sb_product_search", "sb_district", "sb_competitors", "quick_search_drug", "drug_search_filter", "drug_suggest_radio"]
-with st.sidebar.container():
-    if st.button("🔄 Изчисти всички филтри", use_container_width=True, type="secondary", key="reset_filters_btn"):
+FILTER_KEYS = [
+    "sb_region",
+    "sb_product",
+    "sb_product_search",
+    "sb_district",
+    "sb_competitors",
+    "quick_search_drug",
+    "drug_search_filter",
+    "drug_suggest_radio",
+]
+col_reset, col_info = st.columns([1, 3])
+with col_reset:
+    if st.button("🔄 Изчисти всички филтри", type="secondary", key="reset_filters_btn"):
         for k in FILTER_KEYS:
             if k in st.session_state:
                 del st.session_state[k]
         st.rerun()
-st.sidebar.markdown("")  # малък разстояние
+with col_info:
+    if "Source" in df_raw.columns:
+        sources = sorted(df_raw["Source"].unique())
+        st.caption(f"Заредени: {', '.join(sources)}")
 
-# Показване на заредените категории
-if "Source" in df_raw.columns:
-    sources = sorted(df_raw["Source"].unique())
-    st.sidebar.caption(f"Заредени: {', '.join(sources)}")
-
-# Създаване на филтри (с default от Quick Search ако има)
-filters = create_filters(df_raw, default_product=st.session_state.get('quick_search_drug'))
+# Създаване на филтри (с default от Quick Search ако има) – в основното тяло, не в sidebar
+filters = create_filters(df_raw, default_product=st.session_state.get("quick_search_drug"), use_sidebar=False)
 
 # Прилагане на филтрите
 df_filtered = apply_filters(df_raw, filters)

@@ -165,32 +165,14 @@ def load_all_excel_files(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
     """
     master_file = data_dir / "master_data.csv"
     
-    # Проверка за master_data.csv
+    # Ако master_data.csv съществува – винаги го използваме като единствен източник.
+    # Той вече съдържа всички необходими трансформации (вкл. Team tagging).
     if master_file.exists():
         try:
-            # Проверка дали е актуален
-            master_mtime = master_file.stat().st_mtime
-            
-            # Намираме най-новия Excel файл
-            excel_files = []
-            for ext in config.EXCEL_EXTENSIONS:
-                excel_files.extend(data_dir.glob(f"*{ext}"))
-            
-            excel_files = [f for f in excel_files if not f.name.startswith(config.TEMP_FILE_PREFIX)]
-            
-            is_fresh = True
-            if excel_files:
-                newest_excel_mtime = max(f.stat().st_mtime for f in excel_files)
-                is_fresh = master_mtime > newest_excel_mtime
-            
-            if is_fresh:
-                logger.info("✓ Зареждане от master_data.csv (БЪРЗО)")
-                df = pd.read_csv(master_file)
-                logger.info(f"✓ Заредени {len(df):,} реда от master_data.csv")
-                return df
-            else:
-                logger.info("⚠ master_data.csv е остарял, обработвам Excel файлове...")
-        
+            logger.info("✓ Зареждане от master_data.csv (основен източник)")
+            df = pd.read_csv(master_file)
+            logger.info(f"✓ Заредени {len(df):,} реда от master_data.csv")
+            return df
         except Exception as e:
             logger.warning(f"Грешка при четене на master_data.csv: {e}")
             logger.info("Обработвам Excel файлове директно...")

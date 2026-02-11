@@ -13,7 +13,7 @@ from typing import List, Optional, Tuple
 import config
 
 
-def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
+def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: bool = True) -> dict:
     """
     Създава sidebar филтри за избор на регион, медикамент, молекула, brick.
     
@@ -29,7 +29,8 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
     dict
         Речник с избраните стойности от потребителя
     """
-    st.sidebar.header("Филтри")
+    ui = st.sidebar if use_sidebar else st
+    ui.header("Филтри")
     
     # Списъци от уникални стойности
     regions = ["Всички"] + sorted(df["Region"].unique())
@@ -39,7 +40,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
     districts = ["Всички"] + sorted(df["District"].unique()) if has_district else []
     
     # 1. Регион
-    sel_region = st.sidebar.selectbox(
+    sel_region = ui.selectbox(
         "1. Регион",
         regions,
         index=0,
@@ -60,7 +61,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
     # Инициализация само при първо зареждане (виджетът с key= управлява стойността си)
     if search_key not in st.session_state:
         st.session_state[search_key] = current_selected or ""
-    search_val = st.sidebar.text_input(
+    search_val = ui.text_input(
         "2. Медикамент (основен)",
         placeholder=search_placeholder,
         help="Пиши за търсене – избираш с клик върху предложение (не е нужен Enter)",
@@ -71,25 +72,25 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
     if search_term:
         matched = [d for d in drugs if search_term in d.lower()][:20]
         if matched:
-            st.sidebar.caption("Избери с клик:")
-            cols = st.sidebar.columns(2)
+            ui.caption("Избери с клик:")
+            cols = ui.columns(2)
             for i, drug in enumerate(matched):
                 with cols[i % 2]:
-                    if st.button(drug, key=f"sb_drug_btn_{drug}", use_container_width=True):
+                    if ui.button(drug, key=f"sb_drug_btn_{drug}", use_container_width=True):
                         st.session_state["sb_product"] = drug
                         st.session_state[search_key] = drug
                         if "quick_search_drug" in st.session_state:
                             del st.session_state["quick_search_drug"]
                         st.rerun()
         else:
-            st.sidebar.caption("Няма съвпадения – опитай друго име")
+            ui.caption("Няма съвпадения – опитай друго име")
     else:
-        st.sidebar.caption("Пиши поне 1 символ за предложения")
+        ui.caption("Пиши поне 1 символ за предложения")
     
     sel_product = st.session_state["sb_product"]
     
     # 3. Brick (район)
-    sel_district = st.sidebar.selectbox(
+    sel_district = ui.selectbox(
         "3. Brick (район)",
         districts,
         index=0,
@@ -172,11 +173,11 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
         competitor_options = [d for d in drugs if d != sel_product]
     
     # Top 3: изчисли по избрания Region/Brick, запис в session_state, rerun
-    col1, col2 = st.sidebar.columns([3, 1])
+    col1, col2 = ui.columns([3, 1])
     with col1:
-        st.markdown("**Добави конкуренти**")
+            ui.markdown("**Добави конкуренти**")
     with col2:
-        add_top3 = st.button("Top 3", help="Наш продукт + Top 3 по продажби за избрания регион", key="top3_btn")
+        add_top3 = ui.button("Top 3", help="Наш продукт + Top 3 по продажби за избрания регион", key="top3_btn")
     
     # Филами данните по избран Region и Brick за Top 3
     df_filtered_for_top3 = df.copy()
@@ -207,7 +208,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None) -> dict:
     
     help_text = "📊 Класове (общи продажби) | Медикаменти сортирани по продажби (най-много → най-малко)"
     # Не подаваме default, за да избегнем конфликт с директно задаване на st.session_state[\"sb_competitors\"]
-    competitor_products = st.sidebar.multiselect(
+    competitor_products = ui.multiselect(
         "Избери конкуренти",
         competitor_options,
         help=help_text,
