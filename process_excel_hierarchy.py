@@ -305,6 +305,10 @@ def process_pharma_excel(
         # Преименуване на "Period" в "Quarter" (за съвместимост с app.py)
         df_melted = df_melted.rename(columns={"Period": "Quarter"})
         
+        # Нормализация на Region: "Region Blagoevgrad" -> "Blagoevgrad" (за еднакъв формат между Team 1/2/3)
+        if "Region" in df_melted.columns:
+            df_melted["Region"] = df_melted["Region"].astype(str).str.replace(r"^Region\s+", "", regex=True).str.strip()
+        
         logger.info(f"✓ Обработени {len(df_melted)} реда")
         
         # === 12. ЗАПАЗВАНЕ В CSV (ОПЦИОНАЛНО) ===

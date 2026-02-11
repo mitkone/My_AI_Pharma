@@ -233,6 +233,10 @@ def prepare_data_for_display(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
     
+    # Нормализация на Region: "Region Blagoevgrad" -> "Blagoevgrad" (Team 1/2/3 съвместимост)
+    if "Region" in df.columns:
+        df["Region"] = df["Region"].astype(str).str.replace(r"^Region\s+", "", regex=True).str.strip()
+    
     # Добавяне на молекули
     df = add_molecule_column(df)
     
