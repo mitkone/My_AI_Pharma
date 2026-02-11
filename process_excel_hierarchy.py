@@ -44,8 +44,8 @@ def _detect_sheet_name(filepath: Union[str, bytes, io.BytesIO]) -> str:
     try:
         xl = pd.ExcelFile(filepath)
         
-        # Приоритет 1: лист с "Bricks" (пълни данни по брикове)
-        bricks_sheets = [s for s in xl.sheet_names if "Bricks" in s]
+        # Приоритет 1: лист с "bricks" (Total bricks / Total Bricks – case-insensitive)
+        bricks_sheets = [s for s in xl.sheet_names if "bricks" in s.lower()]
         if bricks_sheets:
             logger.info(f"Използван лист: {bricks_sheets[0]}")
             return bricks_sheets[0]
