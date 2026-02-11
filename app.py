@@ -262,7 +262,7 @@ with col_admin:
         with st.expander("🔐 Admin", expanded=False):
             pw = st.text_input("Парола", type="password", key="admin_pw")
             if st.button("Влез"):
-                if pw == "1234":
+                if pw == "110215":
                     st.session_state["is_admin"] = True
                     st.rerun()
                 else:
