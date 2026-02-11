@@ -219,9 +219,11 @@ hide_st_style = '''
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
-.stDeployButton {display: none;}
-[data-testid="stToolbar"] {display: none;}
-[data-testid="stDecoration"] {display: none;}
+.stDeployButton {display: none !important;}
+[data-testid="stToolbar"] {display: none !important;}
+[data-testid="stDecoration"] {display: none !important;}
+[data-testid="stDeployButton"] {display: none !important;}
+a[href*="manage"] {display: none !important;}
 .pharmalyze-card {
     border-radius: 12px;
     padding: 1rem 1.25rem;
@@ -318,45 +320,38 @@ if st.button(f"🔄 Смени екип (сега: {selected_team_label})"):
 
 is_admin = st.session_state.get("is_admin", False)
 
-# Скриваме sidebar за не-admin потребители (чист landing / mobile-first)
-if not is_admin:
-    st.markdown(
-        """
-        <style>
-        [data-testid="stSidebar"] { display: none; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+# Sidebar винаги скрит – admin панелът е на главната страница
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] { display: none; }
+    a[href*="manage"] { display: none !important; }
+    [data-testid="stDeployButton"] { display: none !important; }
+    .stDeployButton { display: none !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
-# ===== ADMIN PANEL (само за admin, в sidebar) =====
+# ===== ADMIN PANEL – на главната страница (само за admin) =====
 if is_admin:
-    # Логваме влизане в Admin секцията (веднъж на минута)
     track_visit("Admin")
 
-    st.sidebar.header("⚙️ Admin Panel")
-
-    # Team selector за качвания
-    admin_team = st.sidebar.selectbox(
-        "Team за този файл",
-        ["Team 1", "Team 2", "Team 3"],
-        index=1,
-        key="admin_upload_team",
-        help="Всеки качен файл ще бъде тагнат към избрания екип.",
-    )
-
-    # File uploader за нови Excel файлове
-    uploaded_file = st.sidebar.file_uploader(
-        "📤 Качи нов Excel файл",
-        type=["xlsx", "xls"],
-        help="Качи Excel файл с фармацевтични данни (същият формат като другите)"
-    )
-    
-    if uploaded_file is not None:
-        # Обработка на качения файл
-        st.sidebar.info(f"Качен: {uploaded_file.name}")
-        
-        if st.sidebar.button("✅ Обработи и добави към master_data.csv", type="primary"):
+    with st.expander("⚙️ Admin", expanded=True):
+        admin_team = st.selectbox(
+            "Екип за този файл",
+            ["Team 1", "Team 2", "Team 3"],
+            index=1,
+            key="admin_upload_team",
+        )
+        uploaded_file = st.file_uploader(
+            "📤 Качи Excel файл",
+            type=["xlsx", "xls"],
+            key="admin_file_upload",
+        )
+        if uploaded_file is not None:
+            st.caption(f"Качен: {uploaded_file.name}")
+            if st.button("✅ Обработи и добави", type="primary", key="admin_process_btn"):
             from process_excel_hierarchy import process_pharma_excel
             from create_master_data import robust_clean_excel
             from data_processing import extract_source_name
@@ -409,105 +404,35 @@ if is_admin:
                         except Exception:
                             pass
 
-                        st.sidebar.success(f"✅ Добавени {len(df_new)} нови реда!")
-                        st.sidebar.info("Моля, натисни „Rerun\" в приложението, за да заредиш новите данни.")
+                        st.success(f"✅ Добавени {len(df_new)} нови реда! Натисни Rerun.")
                     else:
-                        st.sidebar.error("Файлът е празен след обработка!")
-                
+                        st.error("Файлът е празен.")
                 except Exception as e:
-                    st.sidebar.error(f"Грешка: {e}")
+                    st.error(f"Грешка: {e}")
 
-    # Dashboard Configuration (Admin only)
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📋 Dashboard Configuration")
-    cfg = get_dashboard_config()
+        st.markdown("---")
+        st.markdown("**Статистика**")
+        unique_views = total_views = 0
+        if VISIT_LOG_PATH.exists():
+            try:
+                df_v = pd.read_csv(VISIT_LOG_PATH)
+                if not df_v.empty and "section" in df_v.columns:
+                    unique_views = df_v["section"].nunique()
+                    total_views = len(df_v)
+            except Exception:
+                pass
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("Уникални гледания", unique_views, help="Брой различни секции")
+        with c2:
+            st.metric("Общо гледания", total_views, help="Общ брой посещения")
+        with c3:
+            if st.button("🔄 Нулирай брояча", key="admin_reset_btn"):
+                reset_analytics()
+                st.success("Нулирано.")
+                st.rerun()
 
-    st.sidebar.caption("Toggle features (apply instantly)")
-    cfg["show_performance_cards"] = st.sidebar.toggle("Show Performance Cards", value=cfg.get("show_performance_cards", True), key="cfg_perf")
-    cfg["show_ai_insights"] = st.sidebar.toggle("Show AI Insights", value=cfg.get("show_ai_insights", True), key="cfg_ai")
-    cfg["show_market_share"] = st.sidebar.toggle("Show Market Share", value=cfg.get("show_market_share", True), key="cfg_ms")
-    cfg["show_evolution_index"] = st.sidebar.toggle("Show Evolution Index", value=cfg.get("show_evolution_index", True), key="cfg_ei")
-    cfg["show_target_tracker"] = st.sidebar.toggle("Show Targets", value=cfg.get("show_target_tracker", True), key="cfg_tt")
-    st.sidebar.caption("Optional modules")
-    cfg["show_trend_analysis"] = st.sidebar.toggle("Trend Analysis Graph", value=cfg.get("show_trend_analysis", False), key="cfg_trend")
-    cfg["show_regional_ranking"] = st.sidebar.toggle("Regional Ranking Table", value=cfg.get("show_regional_ranking", False), key="cfg_reg")
-    cfg["show_product_deep_dive"] = st.sidebar.toggle("Product Deep Dive", value=cfg.get("show_product_deep_dive", False), key="cfg_pdd")
-    st.sidebar.caption("Advanced visualizations")
-    cfg["show_churn_alert_table"] = st.sidebar.toggle("Churn Alert Table", value=cfg.get("show_churn_alert_table", False), key="cfg_churn")
-    cfg["show_growth_leaders_table"] = st.sidebar.toggle("Top Growth Table", value=cfg.get("show_growth_leaders_table", False), key="cfg_growth_leaders")
-    cfg["show_regional_growth_table"] = st.sidebar.toggle("Regional Growth Table", value=cfg.get("show_regional_growth_table", False), key="cfg_reg_growth")
-
-    cfg["default_comparison_period"] = st.sidebar.selectbox(
-        "Default Comparison Period",
-        ["Quarter vs Quarter", "Month vs Month"],
-        index=0 if cfg.get("default_comparison_period") == "Quarter vs Quarter" else 1,
-        key="cfg_period",
-    )
-
-    order_labels = [COMPONENT_LABELS.get(cid, cid) for cid in COMPONENT_IDS]
-    current_order = cfg.get("component_order", list(COMPONENT_IDS))
-    current_order_labels = [COMPONENT_LABELS.get(cid, cid) for cid in current_order]
-    selected_order_labels = st.sidebar.multiselect(
-        "Component order (select in display order)",
-        order_labels,
-        default=current_order_labels,
-        key="cfg_order_multiselect",
-    )
-    if selected_order_labels:
-        label_to_id = {v: k for k, v in COMPONENT_LABELS.items()}
-        cfg["component_order"] = [label_to_id.get(lb, lb) for lb in selected_order_labels]
-        for cid in COMPONENT_IDS:
-            if cid not in cfg["component_order"]:
-                cfg["component_order"].append(cid)
-
-    if st.sidebar.button("💾 Save config to file", key="cfg_save_btn"):
-        save_config_to_json(cfg)
-        st.sidebar.success("Config saved.")
-
-    # Admin статистика: System Analytics
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📊 System Analytics")
-    if VISIT_LOG_PATH.exists():
-        try:
-            df_visits = pd.read_csv(VISIT_LOG_PATH)
-            if not df_visits.empty and "section" in df_visits.columns:
-                counts = df_visits["section"].value_counts().reset_index()
-                counts.columns = ["Section", "Visits"]
-                import plotly.express as px
-                fig_admin = px.bar(
-                    counts,
-                    x="Visits",
-                    y="Section",
-                    orientation="h",
-                    title="Most Visited Sections",
-                    text="Visits",
-                )
-                fig_admin.update_layout(
-                    height=300,
-                    margin=dict(l=10, r=10, t=40, b=10),
-                    dragmode=False,
-                )
-                st.sidebar.plotly_chart(fig_admin, use_container_width=True, config=config.PLOTLY_CONFIG)
-            else:
-                st.sidebar.caption("Няма записани посещения.")
-        except Exception:
-            st.sidebar.caption("Грешка при четене на лог файла.")
-    else:
-        st.sidebar.caption("Няма записани посещения.")
-
-    # Reset Statistics
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**Reset statistics**")
-    confirm_reset = st.sidebar.checkbox("Are you sure?", key="confirm_reset_stats")
-    if st.sidebar.button("Reset Statistics", type="primary", key="reset_stats_btn"):
-        if confirm_reset:
-            reset_analytics()
-            st.sidebar.success("Statistics have been reset successfully!")
-            st.rerun()
-        else:
-            st.sidebar.warning("Моля, отбележи „Are you sure?\" преди да нулираш статистиката.")
-
-    st.sidebar.divider()
+cfg = get_dashboard_config()
 
 # ============================================================================
 # QUICK SEARCH – автокомплит: пиши и избирай от предложенията
