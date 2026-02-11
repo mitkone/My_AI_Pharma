@@ -279,30 +279,40 @@ if df_raw.empty:
 
 
 # ============================================================================
-# SIDEBAR - ACCESS CONTROL & ОПЦИИ
+# ADMIN LOGIN – sidebar се показва само за admin
 # ============================================================================
 
-st.sidebar.header("🔐 Достъп")
+is_admin = st.session_state.get("is_admin", False)
 
-# Password protection за Admin Panel
-admin_password = st.sidebar.text_input(
-    "Admin Password",
-    type="password",
-    placeholder="Въведи парола за admin",
-    help="Само admin може да качва нови файлове"
-)
+with st.expander("🔐 Admin login"):
+    admin_password = st.text_input(
+        "Admin Password",
+        type="password",
+        placeholder="Въведи парола за admin",
+        key="admin_password_main",
+    )
+    if st.button("Влез като Admin", key="admin_login_btn"):
+        if admin_password == "1234":
+            st.session_state["is_admin"] = True
+            st.success("Влезе в Admin режим. Sidebar Admin Panel е активен.")
+            st.experimental_rerun()
+        else:
+            st.error("Грешна парола.")
 
-is_admin = (admin_password == "1234")
+is_admin = st.session_state.get("is_admin", False)
 
-# Показване на роля
-if is_admin:
-    st.sidebar.success("✅ Admin режим")
-else:
-    st.sidebar.info("👤 User режим")
+# Скриваме sidebar за не-admin потребители (mobile-first, чист landing)
+if not is_admin:
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] { display: none; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-st.sidebar.divider()
-
-# ===== ADMIN PANEL (само за admin) =====
+# ===== ADMIN PANEL (само за admin, в sidebar) =====
 if is_admin:
     # Логваме влизане в Admin секцията (веднъж на минута)
     track_visit("Admin")
@@ -373,13 +383,17 @@ if is_admin:
 
                         # Запазваме обновения master_data.csv
                         df_updated.to_csv(master_path, index=False, encoding="utf-8-sig")
-                        
+
+                        # Изчистваме кеша на данните, за да се заредят новите редове веднага
+                        try:
+                            from data_processing import load_all_excel_files, load_data
+                            load_all_excel_files.clear()
+                            load_data.clear()
+                        except Exception:
+                            pass
+
                         st.sidebar.success(f"✅ Добавени {len(df_new)} нови реда!")
-                        st.sidebar.info("Моля рестартирай апликацията за да заредиш новите данни.")
-                        
-                        # Бутон за рестартиране
-                        if st.sidebar.button("🔄 Рестартирай сега"):
-                            st.rerun()
+                        st.sidebar.info("Моля, натисни „Rerun\" в приложението, за да заредиш новите данни.")
                     else:
                         st.sidebar.error("Файлът е празен след обработка!")
                 
