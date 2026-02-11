@@ -215,31 +215,54 @@ st.set_page_config(
 )
 
 hide_st_style = '''
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            .pharmalyze-card {
-                border-radius: 12px;
-                padding: 1rem 1.25rem;
-                margin-bottom: 1rem;
-                background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
-                border: 1px solid #1e293b;
-                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            }
-            </style>
-            '''
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+.stDeployButton {display: none;}
+[data-testid="stToolbar"] {display: none;}
+[data-testid="stDecoration"] {display: none;}
+.pharmalyze-card {
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+    border: 1px solid #1e293b;
+}
+.section-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 1rem 0 0.5rem 0;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid #334155;
+}
+.team-btn { font-size: 1.2rem; padding: 1rem 2rem; }
+</style>
+'''
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
 
 # ============================================================================
-# ЗАГЛАВИЕ И ЗАРЕЖДАНЕ НА ДАННИ
+# ЗАГЛАВИЕ И ADMIN (горе в ляво)
 # ============================================================================
-
-st.title("📱 Pharma Analytics 2026")
-st.markdown(
-    "Мобилен dashboard за екипи по продажби – "
-    "избери екип и медикамент за дълбок анализ."
-)
+col_admin, col_logo = st.columns([1, 4])
+with col_admin:
+    is_admin = st.session_state.get("is_admin", False)
+    if not is_admin:
+        with st.expander("🔐 Admin", expanded=False):
+            pw = st.text_input("Парола", type="password", key="admin_pw")
+            if st.button("Влез"):
+                if pw == "1234":
+                    st.session_state["is_admin"] = True
+                    st.rerun()
+                else:
+                    st.error("Грешна парола")
+    else:
+        if st.button("🚪 Изход от Admin"):
+            st.session_state["is_admin"] = False
+            st.rerun()
+with col_logo:
+    st.title("📱 Pharma Analytics 2026")
 
 # Един път зареждане; df_raw се подава по референция към всички табове
 df_raw = load_data()
@@ -254,50 +277,44 @@ if df_raw.empty:
 
 
 # ============================================================================
-# LANDING – Welcome & Team selection (скрива dashboard-а до избор на екип)
+# LANDING – 3 големи бутона Team 1 / 2 / 3
 # ============================================================================
 
-# Retro-fix: ако в master_data няма Team колона, маркираме всички редове като Team 2
 if "Team" not in df_raw.columns:
     df_raw["Team"] = "Team 2"
 
-team_options = ["Избери екип...", "Team 1", "Team 2", "Team 3", "All Teams"]
-selected_team_label = st.selectbox("Екип", team_options, index=0, key="landing_team")
-
-if selected_team_label == "Избери екип...":
-    st.info("Моля, избери екип (Team 1, 2, 3 или All Teams), за да продължиш.")
+selected_team_label = st.session_state.get("selected_team", "")
+if not selected_team_label:
+    st.markdown("**Избери екип**")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("**Team 1**", use_container_width=True, key="btn_t1", type="primary"):
+            st.session_state["selected_team"] = "Team 1"
+            st.rerun()
+    with c2:
+        if st.button("**Team 2**", use_container_width=True, key="btn_t2", type="primary"):
+            st.session_state["selected_team"] = "Team 2"
+            st.rerun()
+    with c3:
+        if st.button("**Team 3**", use_container_width=True, key="btn_t3", type="primary"):
+            st.session_state["selected_team"] = "Team 3"
+            st.rerun()
     st.stop()
 
-st.session_state["selected_team"] = selected_team_label
-
-if selected_team_label != "All Teams":
-    df_raw = df_raw[df_raw["Team"] == selected_team_label].copy()
+selected_team_label = st.session_state["selected_team"]
+df_raw = df_raw[df_raw["Team"] == selected_team_label].copy()
 
 if df_raw.empty:
-    st.warning("Няма налични данни за избрания екип.")
+    st.warning("Няма данни за избрания екип.")
+    if st.button("← Назад"):
+        del st.session_state["selected_team"]
+        st.rerun()
     st.stop()
 
-
-# ============================================================================
-# ADMIN LOGIN – sidebar се показва само за admin
-# ============================================================================
-
-is_admin = st.session_state.get("is_admin", False)
-
-with st.expander("🔐 Admin login"):
-    admin_password = st.text_input(
-        "Admin Password",
-        type="password",
-        placeholder="Въведи парола за admin",
-        key="admin_password_main",
-    )
-    if st.button("Влез като Admin", key="admin_login_btn"):
-        if admin_password == "1234":
-            st.session_state["is_admin"] = True
-            st.success("Влезе в Admin режим. Sidebar Admin Panel е активен.")
-            st.rerun()
-        else:
-            st.error("Грешна парола.")
+# Малък бутон за смяна на екип
+if st.button(f"🔄 Смени екип (сега: {selected_team_label})"):
+    del st.session_state["selected_team"]
+    st.rerun()
 
 is_admin = st.session_state.get("is_admin", False)
 
@@ -507,7 +524,7 @@ _all_drugs = sorted([
     if not _is_atc_class(d)
 ])
 
-st.markdown("### 🔍 Търсене на медикамент")
+st.markdown('<p class="section-header">🔍 Търсене на медикамент</p>', unsafe_allow_html=True)
 # Поле за търсене: при всяко натискане се обновява (без Enter), ако е инсталиран streamlit-keyup
 if st_keyup:
     drug_filter = st_keyup(
@@ -550,6 +567,8 @@ if not selected_drug:
     st.stop()
 
 st.session_state["quick_search_drug"] = selected_drug
+st.session_state["sb_product"] = selected_drug
+st.session_state["sb_product_search"] = selected_drug
 st.success(f"✅ Избран: **{selected_drug}**")
 periods_temp = get_sorted_periods(df_raw)
 drug_data = df_raw[df_raw["Drug_Name"] == selected_drug].copy()
@@ -569,11 +588,9 @@ if not drug_data.empty and len(periods_temp) >= 2:
 st.markdown("---")
 
 # ============================================================================
-# ФИЛТРИ НА ГЛАВНАТА СТРАНИЦА (без sidebar за потребителя)
+# ФИЛТРИ – Регион, Brick, Медикамент, Конкуренти (sb_product вече синхронизиран с quick search)
 # ============================================================================
-
-st.markdown("### 🔧 Филтри за анализ")
-
+st.markdown('<p class="section-header">🔧 Филтри</p>', unsafe_allow_html=True)
 FILTER_KEYS = [
     "sb_region",
     "sb_product",
@@ -679,14 +696,15 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                                 market_share_pct = (national_product_last / class_last * 100) if class_last > 0 else 0
                 regions_count = selected_product_data[selected_product_data["Quarter"] == last_period]["Region"].nunique()
                 growth_units = int(last_units - prev_units)
-                st.markdown("### 📊 Ключови показатели")
                 region_label = filters["region"] if filters["region"] != "Всички" else "Всички региони"
                 brick_label = filters["district"] if filters.get("district") and filters["district"] != "Всички" else "Всички Брикове"
-                st.info(f"📍 **Анализ за:** {region_label} | **Брик:** {brick_label}")
-                st.metric(label=f"Продажби {last_period}", value=f"{int(last_units):,} опак.", delta=f"{growth_pct:+.1f}%")
-                st.metric(label="Market Share (национално)", value=f"{market_share_pct:.2f}%", delta=None)
-                st.metric(label="Активни региони", value=f"{regions_count}", delta=None)
-                st.metric(label="Промяна опаковки", value=f"{abs(growth_units):,}", delta=f"{'↑' if growth_units > 0 else '↓'} {abs(growth_pct):.1f}%")
+                st.markdown('<p class="section-header">📊 Ключови показатели</p>', unsafe_allow_html=True)
+                st.caption(f"📍 **{region_label}** | **Брик:** {brick_label}")
+                k1, k2, k3, k4 = st.columns(4)
+                with k1: st.metric("Продажби", f"{int(last_units):,}", f"{growth_pct:+.1f}%")
+                with k2: st.metric("MS", f"{market_share_pct:.2f}%", None)
+                with k3: st.metric("Региони", str(regions_count), None)
+                with k4: st.metric("Промяна", f"{abs(growth_units):,}", f"{'↑' if growth_units > 0 else '↓'} {abs(growth_pct):.1f}%")
 
         elif comp_id == "ai_insights":
             display_ai_insights(df_raw, df_filtered, filters, periods)
@@ -765,107 +783,49 @@ if (
 st.markdown("---")
 
 # ============================================================================
-# НАВИГАЦИЯ – mobile-first: Dashboard / Evolution Index / AI Analyst
+# DASHBOARD – всичко в един scroll (Evolution Index вграден, AI Analyst скрит)
 # ============================================================================
+st.markdown('<p class="section-header">📈 Dashboard</p>', unsafe_allow_html=True)
+track_visit("Dashboard")
+df_agg, y_col, y_label = calculate_metric_data(
+    df=df_filtered,
+    products_list=products_on_chart,
+    periods=periods,
+    metric=metric,
+    df_full=df_raw,
+)
+df_agg_result = create_timeline_chart(
+    df_agg=df_agg, y_col=y_col, y_label=y_label, periods=periods,
+    sel_product=filters["product"], competitors=filters["competitors"],
+)
+if df_agg_result is not None and cfg.get("show_market_share", True):
+    if filters["region"] == "Всички":
+        show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
+    else:
+        df_regional_share = calculate_regional_market_share(
+            df=df_filtered, products_list=products_on_chart, periods=periods, period_col="Quarter"
+        )
+        if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
+            show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
 
-nav_choice = st.radio(
-    "Избери секция",
-    ["📈 Dashboard", "📊 Evolution Index", "🤖 AI Analyst"],
-    horizontal=True,
-    key="main_nav",
+st.markdown('<p class="section-header">🗺️ Разбивка по Brick (райони)</p>', unsafe_allow_html=True)
+create_brick_charts(
+    df=df_raw, products_list=products_on_chart, sel_product=filters["product"],
+    competitors=filters["competitors"], periods=periods,
 )
 
-if nav_choice == "📈 Dashboard":
-    st.markdown("## 📈 Dashboard")
-    # Основен timeline + Market Share
-    track_visit("Dashboard")
-    df_agg, y_col, y_label = calculate_metric_data(
-        df=df_filtered,
-        products_list=products_on_chart,
-        periods=periods,
-        metric=metric,
-        df_full=df_raw,
-    )
-    df_agg_result = create_timeline_chart(
-        df_agg=df_agg,
-        y_col=y_col,
-        y_label=y_label,
-        periods=periods,
-        sel_product=filters["product"],
-        competitors=filters["competitors"],
-    )
-    if df_agg_result is not None and cfg.get("show_market_share", True):
-        show_market_share_table(
-            df_agg_result, period_col="Quarter", is_national=True, key_suffix="national"
-        )
-        if filters["region"] != "Всички":
-            st.markdown("---")
-            df_regional_share = calculate_regional_market_share(
-                df=df_filtered, products_list=products_on_chart, periods=periods, period_col="Quarter"
-            )
-            if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
-                show_market_share_table(
-                    df_regional_share,
-                    period_col="Quarter",
-                    is_national=False,
-                    key_suffix="regional",
-                )
+st.markdown('<p class="section-header">⚖️ Сравнение по периоди и региони</p>', unsafe_allow_html=True)
+create_period_comparison(df=df_filtered, products_list=products_on_chart, periods=periods)
+st.divider()
+if periods:
+    create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1])
 
-    # Brick view
-    st.markdown("---")
-    st.markdown("### 🗺️ По Brick (райони)")
-    create_brick_charts(
-        df=df_raw,
-        products_list=products_on_chart,
-        sel_product=filters["product"],
-        competitors=filters["competitors"],
-        periods=periods,
-    )
+st.markdown('<p class="section-header">📅 Последно vs Предишно тримесечие</p>', unsafe_allow_html=True)
+render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
 
-    # Comparison view
-    st.markdown("---")
-    st.markdown("### ⚖️ Сравнение по периоди и региони")
-    create_period_comparison(df=df_filtered, products_list=products_on_chart, periods=periods)
-    st.divider()
-    if periods:
-        create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1])
-
-    # Last vs Previous
-    st.markdown("---")
-    st.markdown("### 📅 Последно vs Предишно тримесечие")
-    render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
-
-elif nav_choice == "📊 Evolution Index":
-    st.markdown("## 📊 Evolution Index")
-    track_visit("Evolution Index")
-    render_evolution_index_tab(
-        df_filtered=df_filtered,
-        df_national=df_raw,
-        periods=periods,
-        filters=filters,
-        period_col="Quarter",
-    )
-
-elif nav_choice == "🤖 AI Analyst":
-    st.markdown("## 🤖 AI Analyst")
-    render_ai_analysis_tab(
-        df=df_filtered,
-        sel_product=filters["product"],
-        competitors=filters["competitors"],
-    )
-
-
-# ============================================================================
-# ЕКСПОРТ НА ДАННИ (само таблица; без отделен таб)
-# ============================================================================
-
-with st.expander("📋 Данни"):
-    st.dataframe(df_chart, use_container_width=True, height=300)
-
-csv = df_chart.to_csv(index=False)
-st.download_button(
-    "📥 Download CSV",
-    data=csv,
-    file_name="pharma_export.csv",
-    mime="text/csv",
+st.markdown('<p class="section-header">📊 Еволюционен Индекс</p>', unsafe_allow_html=True)
+track_visit("Evolution Index")
+render_evolution_index_tab(
+    df_filtered=df_filtered, df_national=df_raw, periods=periods,
+    filters=filters, period_col="Quarter",
 )
