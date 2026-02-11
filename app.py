@@ -219,11 +219,9 @@ hide_st_style = '''
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 header {visibility: hidden;}
-.stDeployButton {display: none !important;}
-[data-testid="stToolbar"] {display: none !important;}
-[data-testid="stDecoration"] {display: none !important;}
-[data-testid="stDeployButton"] {display: none !important;}
-a[href*="manage"] {display: none !important;}
+.stDeployButton {display: none;}
+[data-testid="stToolbar"] {display: none;}
+[data-testid="stDecoration"] {display: none;}
 .pharmalyze-card {
     border-radius: 12px;
     padding: 1rem 1.25rem;
@@ -243,6 +241,16 @@ a[href*="manage"] {display: none !important;}
 '''
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
+# Допълнителен блок за скриване на Manage app (както поиска потребителят)
+hide_st_style_extra = '''
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+.stDeployButton {display:none;}
+</style>
+'''
+st.markdown(hide_st_style_extra, unsafe_allow_html=True)
 
 # ============================================================================
 # ЗАГЛАВИЕ И ADMIN (горе в ляво)
@@ -301,6 +309,67 @@ if not selected_team_label:
         if st.button("**Team 3**", use_container_width=True, key="btn_t3", type="primary"):
             st.session_state["selected_team"] = "Team 3"
             st.rerun()
+
+    # Admin панел – видим и на екрана за избор на екип, ако си логнат
+    if st.session_state.get("is_admin", False):
+        st.markdown("---")
+        with st.expander("⚙️ Admin", expanded=True):
+            admin_team_landing = st.selectbox("Екип за този файл", ["Team 1", "Team 2", "Team 3"], index=1, key="admin_team_landing")
+            uploaded_landing = st.file_uploader("📤 Качи Excel файл", type=["xlsx", "xls"], key="admin_upload_landing")
+            if uploaded_landing is not None:
+                st.caption(f"Качен: {uploaded_landing.name}")
+                if st.button("✅ Обработи и добави", type="primary", key="admin_process_landing"):
+                    from create_master_data import robust_clean_excel
+                    from data_processing import extract_source_name
+                    with st.spinner("Обработка..."):
+                        try:
+                            excel_path = config.DATA_DIR / uploaded_landing.name
+                            with open(excel_path, "wb") as f:
+                                f.write(uploaded_landing.getbuffer())
+                            source_name = extract_source_name(uploaded_landing.name)
+                            df_new = robust_clean_excel(excel_path, source_name)
+                            if not df_new.empty:
+                                df_new["Team"] = admin_team_landing
+                                master_path = config.DATA_DIR / "master_data.csv"
+                                if master_path.exists():
+                                    df_master = pd.read_csv(master_path)
+                                    if "Team" not in df_master.columns:
+                                        df_master["Team"] = "Team 2"
+                                    df_updated = pd.concat([df_master, df_new], ignore_index=True)
+                                else:
+                                    df_updated = df_new
+                                subset_cols = [c for c in ["Region", "Drug_Name", "District", "Quarter", "Source", "Team"] if c in df_updated.columns]
+                                df_updated = df_updated.drop_duplicates(subset=subset_cols, keep="last")
+                                df_updated.to_csv(master_path, index=False, encoding="utf-8-sig")
+                                try:
+                                    from data_processing import load_all_excel_files, load_data
+                                    load_all_excel_files.clear()
+                                    load_data.clear()
+                                except Exception:
+                                    pass
+                                st.success(f"✅ Добавени {len(df_new)} реда. Натисни Rerun.")
+                            else:
+                                st.error("Файлът е празен.")
+                        except Exception as e:
+                            st.error(f"Грешка: {e}")
+            st.markdown("**Статистика**")
+            uv, tv = 0, 0
+            if VISIT_LOG_PATH.exists():
+                try:
+                    df_v = pd.read_csv(VISIT_LOG_PATH)
+                    if not df_v.empty and "section" in df_v.columns:
+                        uv, tv = df_v["section"].nunique(), len(df_v)
+                except Exception:
+                    pass
+            sc1, sc2, sc3 = st.columns(3)
+            with sc1: st.metric("Уникални гледания", uv)
+            with sc2: st.metric("Общо гледания", tv)
+            with sc3:
+                if st.button("🔄 Нулирай брояча", key="reset_landing"):
+                    reset_analytics()
+                    st.success("Нулирано.")
+                    st.rerun()
+
     st.stop()
 
 selected_team_label = st.session_state["selected_team"]
@@ -320,16 +389,8 @@ if st.button(f"🔄 Смени екип (сега: {selected_team_label})"):
 
 is_admin = st.session_state.get("is_admin", False)
 
-# Sidebar винаги скрит – admin панелът е на главната страница
 st.markdown(
-    """
-    <style>
-    [data-testid="stSidebar"] { display: none; }
-    a[href*="manage"] { display: none !important; }
-    [data-testid="stDeployButton"] { display: none !important; }
-    .stDeployButton { display: none !important; }
-    </style>
-    """,
+    '<style>[data-testid="stSidebar"]{display:none;} .stDeployButton{display:none;}</style>',
     unsafe_allow_html=True,
 )
 
