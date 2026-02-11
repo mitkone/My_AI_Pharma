@@ -44,13 +44,19 @@ def _detect_sheet_name(filepath: Union[str, bytes, io.BytesIO]) -> str:
     try:
         xl = pd.ExcelFile(filepath)
         
-        # Търсене на лист с "Bricks" в името (пълни данни)
+        # Приоритет 1: лист с "Bricks" (пълни данни по брикове)
         bricks_sheets = [s for s in xl.sheet_names if "Bricks" in s]
         if bricks_sheets:
             logger.info(f"Използван лист: {bricks_sheets[0]}")
             return bricks_sheets[0]
         
-        # Fallback към първия лист
+        # Приоритет 2: лист с "Level 4", "Region Level" (Team 1 / Areta формат)
+        level_sheets = [s for s in xl.sheet_names if "Level 4" in s or "Region Level" in s or "Level 5" in s]
+        if level_sheets:
+            logger.info(f"Използван лист: {level_sheets[0]}")
+            return level_sheets[0]
+        
+        # Fallback: първият лист
         logger.info(f"Използван лист: {xl.sheet_names[0]}")
         return xl.sheet_names[0]
     
