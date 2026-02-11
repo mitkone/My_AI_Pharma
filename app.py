@@ -352,63 +352,49 @@ if is_admin:
         if uploaded_file is not None:
             st.caption(f"Качен: {uploaded_file.name}")
             if st.button("✅ Обработи и добави", type="primary", key="admin_process_btn"):
-            from process_excel_hierarchy import process_pharma_excel
-            from create_master_data import robust_clean_excel
-            from data_processing import extract_source_name
-            import io
-            
-            with st.spinner("Обработка на новия файл..."):
-                try:
-                    # Запазваме файла временно
-                    excel_path = config.DATA_DIR / uploaded_file.name
-                    with open(excel_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                    
-                    # Обработваме файла
-                    source_name = extract_source_name(uploaded_file.name)
-                    df_new = robust_clean_excel(excel_path, source_name)
+                from process_excel_hierarchy import process_pharma_excel
+                from create_master_data import robust_clean_excel
+                from data_processing import extract_source_name
+                import io
 
-                    if not df_new.empty:
-                        # Добавяме Team колона за този upload
-                        df_new["Team"] = admin_team
+                with st.spinner("Обработка на новия файл..."):
+                    try:
+                        excel_path = config.DATA_DIR / uploaded_file.name
+                        with open(excel_path, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
 
-                        # Зареждаме съществуващия master_data.csv
-                        master_path = config.DATA_DIR / "master_data.csv"
+                        source_name = extract_source_name(uploaded_file.name)
+                        df_new = robust_clean_excel(excel_path, source_name)
 
-                        if master_path.exists():
-                            df_master = pd.read_csv(master_path)
-                            # Retro-fix: ако няма Team колона, маркираме старите данни като Team 2
-                            if "Team" not in df_master.columns:
-                                df_master["Team"] = "Team 2"
-                            # Добавяме новите данни
-                            df_updated = pd.concat([df_master, df_new], ignore_index=True)
+                        if not df_new.empty:
+                            df_new["Team"] = admin_team
+                            master_path = config.DATA_DIR / "master_data.csv"
+
+                            if master_path.exists():
+                                df_master = pd.read_csv(master_path)
+                                if "Team" not in df_master.columns:
+                                    df_master["Team"] = "Team 2"
+                                df_updated = pd.concat([df_master, df_new], ignore_index=True)
+                            else:
+                                df_updated = df_new
+
+                            subset_cols = ["Region", "Drug_Name", "District", "Quarter", "Source", "Team"]
+                            subset_cols = [c for c in subset_cols if c in df_updated.columns]
+                            df_updated = df_updated.drop_duplicates(subset=subset_cols, keep="last")
+                            df_updated.to_csv(master_path, index=False, encoding="utf-8-sig")
+
+                            try:
+                                from data_processing import load_all_excel_files, load_data
+                                load_all_excel_files.clear()
+                                load_data.clear()
+                            except Exception:
+                                pass
+
+                            st.success(f"✅ Добавени {len(df_new)} нови реда! Натисни Rerun.")
                         else:
-                            df_updated = df_new
-
-                        # Премахваме дупликати
-                        subset_cols = ["Region", "Drug_Name", "District", "Quarter", "Source", "Team"]
-                        subset_cols = [c for c in subset_cols if c in df_updated.columns]
-                        df_updated = df_updated.drop_duplicates(
-                            subset=subset_cols,
-                            keep="last"  # Запазваме най-новите
-                        )
-
-                        # Запазваме обновения master_data.csv
-                        df_updated.to_csv(master_path, index=False, encoding="utf-8-sig")
-
-                        # Изчистваме кеша на данните, за да се заредят новите редове веднага
-                        try:
-                            from data_processing import load_all_excel_files, load_data
-                            load_all_excel_files.clear()
-                            load_data.clear()
-                        except Exception:
-                            pass
-
-                        st.success(f"✅ Добавени {len(df_new)} нови реда! Натисни Rerun.")
-                    else:
-                        st.error("Файлът е празен.")
-                except Exception as e:
-                    st.error(f"Грешка: {e}")
+                            st.error("Файлът е празен.")
+                    except Exception as e:
+                        st.error(f"Грешка: {e}")
 
         st.markdown("---")
         st.markdown("**Статистика**")
