@@ -147,62 +147,68 @@ def load_single_excel(filepath: Path) -> Optional[pd.DataFrame]:
 @st.cache_data(show_spinner=False)
 def load_all_excel_files(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
     """
-    Зарежда всички Excel файлове от директория и ги обединява.
+    Зарежда всички Excel файлове и ги обединява.
     
     ПРИОРИТЕТ:
-    1. Ако master_data.csv съществува и е актуален → използва го (БЪРЗО)
-    2. Иначе → обработва Excel файловете поотделно (БАВНО)
+    1. Папки по екипи (data/Team 1/, Team 2/, Team 3/) – всеки екип си има папка
+    2. master_data.csv (за обратна съвместимост)
+    3. Excel в data/ (старо – всичко е Team 2)
     
     Параметри
     ---------
     data_dir : Path
-        Директория с Excel файлове
+        Директория с данни
     
     Връща
     ------
     pd.DataFrame
         Обединен DataFrame от всички файлове
     """
+    frames = []
+    team_folders = getattr(config, "TEAM_FOLDERS", ["Team 1", "Team 2", "Team 3"])
+
+    # 1. Зареждане от папки по екипи – всеки екип си има папка, данните НЕ се губята
+    for team_name in team_folders:
+        team_dir = data_dir / team_name
+        if team_dir.is_dir():
+            for ext in ["*.xlsx", "*.xls"]:
+                for filepath in sorted(team_dir.glob(ext)):
+                    if filepath.name.startswith(config.TEMP_FILE_PREFIX):
+                        continue
+                    df = load_single_excel(filepath)
+                    if df is not None:
+                        df["Team"] = team_name
+                        frames.append(df)
+    if frames:
+        combined = pd.concat(frames, ignore_index=True)
+        logger.info(f"✓ Заредени {len(frames)} файла от папки по екипи: {len(combined):,} реда")
+        return combined
+
+    # 2. master_data.csv (обратна съвместимост)
     master_file = data_dir / "master_data.csv"
-    
-    # Ако master_data.csv съществува – винаги го използваме като единствен източник.
-    # Той вече съдържа всички необходими трансформации (вкл. Team tagging).
     if master_file.exists():
         try:
-            logger.info("✓ Зареждане от master_data.csv (основен източник)")
+            logger.info("✓ Зареждане от master_data.csv")
             df = pd.read_csv(master_file)
             logger.info(f"✓ Заредени {len(df):,} реда от master_data.csv")
             return df
         except Exception as e:
             logger.warning(f"Грешка при четене на master_data.csv: {e}")
-            logger.info("Обработвам Excel файлове директно...")
-    logger.info(f"Сканиране за Excel файлове в {data_dir}")
-    
-    frames = []
+
+    # 3. Excel в корена на data/ (старо – всичко е Team 2)
+    logger.info(f"Сканиране за Excel в {data_dir}")
     excel_files = [
-        f for f in data_dir.glob("*.xlsx")
+        f for f in list(data_dir.glob("*.xlsx")) + list(data_dir.glob("*.xls"))
         if not f.name.startswith(config.TEMP_FILE_PREFIX)
     ]
-    
-    if not excel_files:
-        logger.warning(f"Не са намерени Excel файлове (.xlsx) в {data_dir}")
-        return pd.DataFrame()
-    
-    logger.info(f"Намерени {len(excel_files)} Excel файла")
-    
     for filepath in sorted(excel_files):
         df = load_single_excel(filepath)
         if df is not None:
             frames.append(df)
-    
     if not frames:
-        logger.error("Нито един файл не е зареден успешно!")
         return pd.DataFrame()
-    
-    # Обединяване на всички DataFrame-и
     combined = pd.concat(frames, ignore_index=True)
-    logger.info(f"✓ Обединени {len(frames)} файла: {len(combined)} общо реда")
-    
+    logger.info(f"✓ Обединени {len(frames)} файла: {len(combined)} реда")
     return combined
 
 

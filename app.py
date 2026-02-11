@@ -316,42 +316,23 @@ if not selected_team_label:
     if st.session_state.get("is_admin", False):
         st.markdown("---")
         with st.expander("⚙️ Admin", expanded=True):
+            st.caption("Файловете се пазят в папки data/Team 1/, Team 2/, Team 3/. Всеки екип си има папка – данните не се губята.")
             admin_team_landing = st.selectbox("Екип за този файл", ["Team 1", "Team 2", "Team 3"], index=1, key="admin_team_landing")
             uploaded_landing = st.file_uploader("📤 Качи Excel файл", type=["xlsx", "xls"], key="admin_upload_landing")
             if uploaded_landing is not None:
                 st.caption(f"Качен: {uploaded_landing.name}")
-                if st.button("✅ Обработи и добави", type="primary", key="admin_process_landing"):
-                    from create_master_data import robust_clean_excel
-                    from data_processing import extract_source_name
-                    with st.spinner("Обработка..."):
+                if st.button("✅ Запази в папка на екипа", type="primary", key="admin_process_landing"):
+                    with st.spinner("Записвам..."):
                         try:
-                            excel_path = config.DATA_DIR / uploaded_landing.name
+                            team_dir = config.DATA_DIR / admin_team_landing
+                            team_dir.mkdir(parents=True, exist_ok=True)
+                            excel_path = team_dir / uploaded_landing.name
                             with open(excel_path, "wb") as f:
                                 f.write(uploaded_landing.getbuffer())
-                            source_name = extract_source_name(uploaded_landing.name)
-                            df_new = robust_clean_excel(excel_path, source_name)
-                            if not df_new.empty:
-                                df_new["Team"] = admin_team_landing
-                                master_path = config.DATA_DIR / "master_data.csv"
-                                if master_path.exists():
-                                    df_master = pd.read_csv(master_path)
-                                    if "Team" not in df_master.columns:
-                                        df_master["Team"] = "Team 2"
-                                    df_updated = pd.concat([df_master, df_new], ignore_index=True)
-                                else:
-                                    df_updated = df_new
-                                subset_cols = [c for c in ["Region", "Drug_Name", "District", "Quarter", "Source", "Team"] if c in df_updated.columns]
-                                df_updated = df_updated.drop_duplicates(subset=subset_cols, keep="last")
-                                df_updated.to_csv(master_path, index=False, encoding="utf-8-sig")
-                                try:
-                                    from data_processing import load_all_excel_files, load_data
-                                    load_all_excel_files.clear()
-                                    load_data.clear()
-                                except Exception:
-                                    pass
-                                st.success(f"✅ Добавени {len(df_new)} реда. Натисни Rerun.")
-                            else:
-                                st.error("Файлът е празен.")
+                            from data_processing import load_all_excel_files, load_data
+                            load_all_excel_files.clear()
+                            load_data.clear()
+                            st.success(f"✅ Файлът е запазен в {admin_team_landing}/. Натисни Rerun.")
                         except Exception as e:
                             st.error(f"Грешка: {e}")
             st.markdown("**Статистика**")
@@ -401,6 +382,7 @@ if is_admin:
     track_visit("Admin")
 
     with st.expander("⚙️ Admin", expanded=True):
+        st.caption("Файловете се пазят в папки data/Team 1/, Team 2/, Team 3/. Премести Excel за Team 2 в data/Team 2/, за да продължат да се виждат.")
         admin_team = st.selectbox(
             "Екип за този файл",
             ["Team 1", "Team 2", "Team 3"],
@@ -414,56 +396,18 @@ if is_admin:
         )
         if uploaded_file is not None:
             st.caption(f"Качен: {uploaded_file.name}")
-            if st.button("✅ Обработи и добави", type="primary", key="admin_process_btn"):
-                from process_excel_hierarchy import process_pharma_excel
-                from create_master_data import robust_clean_excel
-                from data_processing import extract_source_name
-                import io
-
-                with st.spinner("Обработка на новия файл..."):
+            if st.button("✅ Запази в папка на екипа", type="primary", key="admin_process_btn"):
+                with st.spinner("Записвам..."):
                     try:
-                        excel_path = config.DATA_DIR / uploaded_file.name
+                        team_dir = config.DATA_DIR / admin_team
+                        team_dir.mkdir(parents=True, exist_ok=True)
+                        excel_path = team_dir / uploaded_file.name
                         with open(excel_path, "wb") as f:
                             f.write(uploaded_file.getbuffer())
-
-                        source_name = extract_source_name(uploaded_file.name)
-                        df_new = robust_clean_excel(excel_path, source_name)
-
-                        if not df_new.empty:
-                            df_new["Team"] = admin_team
-                            master_path = config.DATA_DIR / "master_data.csv"
-
-                            if master_path.exists():
-                                df_master = pd.read_csv(master_path)
-                                if "Team" not in df_master.columns:
-                                    df_master["Team"] = "Team 2"
-                                df_updated = pd.concat([df_master, df_new], ignore_index=True)
-                            else:
-                                # Запазваме съществуващите данни от Excel, не ги губим
-                                from data_processing import load_all_excel_files
-                                df_existing = load_all_excel_files()
-                                if not df_existing.empty:
-                                    if "Team" not in df_existing.columns:
-                                        df_existing["Team"] = "Team 2"
-                                    df_updated = pd.concat([df_existing, df_new], ignore_index=True)
-                                else:
-                                    df_updated = df_new
-
-                            subset_cols = ["Region", "Drug_Name", "District", "Quarter", "Source", "Team"]
-                            subset_cols = [c for c in subset_cols if c in df_updated.columns]
-                            df_updated = df_updated.drop_duplicates(subset=subset_cols, keep="last")
-                            df_updated.to_csv(master_path, index=False, encoding="utf-8-sig")
-
-                            try:
-                                from data_processing import load_all_excel_files, load_data
-                                load_all_excel_files.clear()
-                                load_data.clear()
-                            except Exception:
-                                pass
-
-                            st.success(f"✅ Добавени {len(df_new)} нови реда! Натисни Rerun.")
-                        else:
-                            st.error("Файлът е празен.")
+                        from data_processing import load_all_excel_files, load_data
+                        load_all_excel_files.clear()
+                        load_data.clear()
+                        st.success(f"✅ Файлът е запазен в {admin_team}/. Натисни Rerun.")
                     except Exception as e:
                         st.error(f"Грешка: {e}")
 

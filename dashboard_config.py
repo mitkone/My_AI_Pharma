@@ -61,7 +61,7 @@ DEFAULT_DASHBOARD_CONFIG: dict[str, Any] = {
     "show_market_share": True,
     "show_evolution_index": True,
     "show_performance_cards": True,
-    "show_target_tracker": True,
+    "show_target_tracker": False,
     "show_trend_analysis": False,
     "show_regional_ranking": False,
     "show_product_deep_dive": False,

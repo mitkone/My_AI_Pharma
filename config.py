@@ -12,6 +12,9 @@ PROJECT_DIR = Path(__file__).parent
 # Папка с Excel файлове (същата, където е app.py)
 DATA_DIR = PROJECT_DIR
 
+# Папки по екипи – данните за всеки екип се пазят в отделна папка
+TEAM_FOLDERS = ["Team 1", "Team 2", "Team 3"]
+
 # === STREAMLIT НАСТРОЙКИ ===
 PAGE_TITLE = "STADA Rx Data"
 PAGE_ICON = "📊"
