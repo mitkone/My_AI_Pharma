@@ -26,6 +26,23 @@ COMPONENT_IDS = [
     "product_deep_dive",
 ]
 
+# Page section IDs – големи секции на страницата (Dashboard, Brick, Сравнение и т.н.)
+PAGE_SECTION_IDS = [
+    "dashboard",
+    "brick",
+    "comparison",
+    "last_vs_prev",
+    "evolution_index",
+]
+
+PAGE_SECTION_LABELS = {
+    "dashboard": "📈 Dashboard (графика + Market Share)",
+    "brick": "🗺️ Разбивка по Brick",
+    "comparison": "⚖️ Сравнение по периоди и региони",
+    "last_vs_prev": "📅 Последно vs Предишно тримесечие",
+    "evolution_index": "📊 Еволюционен Индекс",
+}
+
 # Human-readable labels for Admin UI
 COMPONENT_LABELS = {
     "performance_cards": "Performance cards (KPI)",
@@ -54,6 +71,9 @@ DEFAULT_DASHBOARD_CONFIG: dict[str, Any] = {
     "show_regional_growth_table": False,
     "default_comparison_period": "Quarter vs Quarter",  # or "Month vs Month"
     "component_order": list(COMPONENT_IDS),
+    # Ред на главните секции на страницата (за Admin преподреждане)
+    "page_section_order": list(PAGE_SECTION_IDS),
+    **{f"show_section_{sid}": True for sid in PAGE_SECTION_IDS},
 }
 
 
@@ -71,12 +91,21 @@ def load_config_from_json() -> dict | None:
             if k in out:
                 out[k] = v
         if "component_order" in data and isinstance(data["component_order"], list):
-            # Keep only valid ids, append missing
             valid = [c for c in data["component_order"] if c in COMPONENT_IDS]
             for c in COMPONENT_IDS:
                 if c not in valid:
                     valid.append(c)
             out["component_order"] = valid
+        if "page_section_order" in data and isinstance(data["page_section_order"], list):
+            valid = [s for s in data["page_section_order"] if s in PAGE_SECTION_IDS]
+            for s in PAGE_SECTION_IDS:
+                if s not in valid:
+                    valid.append(s)
+            out["page_section_order"] = valid
+        for sid in PAGE_SECTION_IDS:
+            k = f"show_section_{sid}"
+            if k in data:
+                out[k] = data[k]
         return out
     except Exception:
         return None

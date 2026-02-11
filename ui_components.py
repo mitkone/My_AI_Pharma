@@ -736,8 +736,10 @@ def show_market_share_table(
     else:
         st.subheader("📍 Регионален Market Share")
     
-    # Филтрираме само медикаменти (без класове които са 100%)
+    # Филтрираме само медикаменти (без класове 100%, без Grand Total)
     df_drugs = df_agg[df_agg["Market_Share_%"] < 100].copy()
+    if "Drug_Name" in df_drugs.columns:
+        df_drugs = df_drugs[~df_drugs["Drug_Name"].isin(["GRAND TOTAL", "Grand Total"])]
     
     if len(df_drugs) == 0:
         st.info("Няма медикаменти за показване")
@@ -838,7 +840,8 @@ def create_brick_charts(
     sel_product: str,
     competitors: List[str],
     periods: List[str],
-    period_col: str = "Quarter"
+    period_col: str = "Quarter",
+    selected_region: str = None,
 ) -> None:
     """
     Създава графики по региони и brick-ове.
@@ -881,27 +884,30 @@ def create_brick_charts(
     else:
         df_geo_base = df[df[period_col] == geo_period].copy()
     
-    # Ниво на агрегация: Региони vs Brick-ове
-    # Вертикално за мобилна четливост
-    level = st.radio(
-        "Покажи по",
-        ["Региони (Пловдив, Варна, Бургас...)", "Brick-ове в регион (Самоков, Банско, Пазарджик...)"],
-        key="brick_level",
-    )
-    by_region = "Региони" in level
-    
-    # Подготовка на данни
-    if by_region:
-        df_geo = df_geo_base.copy()
-        group_col = "Region"
-    else:
-        sel_region_brick = st.selectbox(
-            "Избери регион",
-            sorted(df["Region"].unique()),
-            key="sel_region_brick",
-        )
-        df_geo = df_geo_base[df_geo_base["Region"] == sel_region_brick].copy()
+    # Ако е избран регион от филтрите – показваме брикове в този регион (без допълнителен избор)
+    if selected_region and selected_region != "Всички":
+        by_region = False
+        df_geo = df_geo_base[df_geo_base["Region"] == selected_region].copy()
         group_col = "District"
+        st.caption(f"📍 Брикове в регион **{selected_region}** (избран от филтрите)")
+    else:
+        level = st.radio(
+            "Покажи по",
+            ["Региони (Пловдив, Варна, Бургас...)", "Brick-ове в регион (избери регион по-долу)"],
+            key="brick_level",
+        )
+        by_region = "Региони" in level
+        if by_region:
+            df_geo = df_geo_base.copy()
+            group_col = "Region"
+        else:
+            sel_region_brick = st.selectbox(
+                "Избери регион",
+                sorted(df["Region"].unique()),
+                key="sel_region_brick",
+            )
+            df_geo = df_geo_base[df_geo_base["Region"] == sel_region_brick].copy()
+            group_col = "District"
     
     # Филтриране на продукти и агрегация
     df_geo_chart = df_geo[df_geo["Drug_Name"].isin(products_list)]

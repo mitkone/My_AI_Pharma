@@ -13,7 +13,8 @@ def create_period_comparison(
     df: pd.DataFrame,
     products_list: List[str],
     periods: List[str],
-    period_col: str = "Quarter"
+    period_col: str = "Quarter",
+    level_label: str = None,
 ) -> None:
     """
     Създава сравнение между два периода.
@@ -28,8 +29,12 @@ def create_period_comparison(
         Налични периоди
     period_col : str
         Колона с периоди
+    level_label : str, optional
+        "Национално ниво" или "Регионално: [Име на регион]"
     """
     st.subheader("📊 Сравнение на периоди")
+    if level_label:
+        st.caption(f"📍 **Ниво:** {level_label}")
     
     if len(periods) < 2:
         st.warning("Нужни са поне 2 периода за сравнение.")
@@ -208,7 +213,8 @@ def create_regional_comparison(
     df: pd.DataFrame,
     products_list: List[str],
     period: str,
-    period_col: str = "Quarter"
+    period_col: str = "Quarter",
+    level_label: str = None,
 ) -> None:
     """
     Създава сравнение между региони за избран период.
@@ -225,6 +231,8 @@ def create_regional_comparison(
         Колона с периоди
     """
     st.subheader(f"🗺️ Сравнение на региони - {period}")
+    if level_label:
+        st.caption(f"📍 **Ниво:** {level_label}")
     
     # Филтриране по период
     df_period = df[df[period_col] == period]

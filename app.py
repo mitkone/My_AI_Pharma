@@ -34,6 +34,8 @@ from dashboard_config import (
     DEFAULT_DASHBOARD_CONFIG,
     COMPONENT_IDS,
     COMPONENT_LABELS,
+    PAGE_SECTION_IDS,
+    PAGE_SECTION_LABELS,
     save_config_to_json,
 )
 from data_processing import load_data, get_sorted_periods
@@ -437,7 +439,23 @@ if is_admin:
                                     df_master["Team"] = "Team 2"
                                 df_updated = pd.concat([df_master, df_new], ignore_index=True)
                             else:
-                                df_updated = df_new
+                                # Запазваме съществуващите данни от Excel, не ги губим
+                                from data_processing import load_all_excel_files
+                                df_existing = load_all_excel_files()
+                                if not df_existing.empty:
+                                    if "Team" not in df_existing.columns:
+                                        df_existing["Team"] = "Team 2"
+                                    df_updated = pd.concat([df_existing, df_new], ignore_index=True)
+                            else:
+                                # Запазваме съществуващите данни от Excel, не ги губим
+                                from data_processing import load_all_excel_files
+                                df_existing = load_all_excel_files()
+                                if not df_existing.empty:
+                                    if "Team" not in df_existing.columns:
+                                        df_existing["Team"] = "Team 2"
+                                    df_updated = pd.concat([df_existing, df_new], ignore_index=True)
+                                else:
+                                    df_updated = df_new
 
                             subset_cols = ["Region", "Drug_Name", "District", "Quarter", "Source", "Team"]
                             subset_cols = [c for c in subset_cols if c in df_updated.columns]
@@ -477,7 +495,51 @@ if is_admin:
             if st.button("🔄 Нулирай брояча", key="admin_reset_btn"):
                 reset_analytics()
                 st.success("Нулирано.")
-                st.rerun()
+
+        st.markdown("---")
+        st.markdown("**Подредба на секции** – галочка = видима, ↑↓ = ред")
+        cfg = get_dashboard_config()
+
+        def _save_section_config():
+            c = get_dashboard_config()
+            for s in PAGE_SECTION_IDS:
+                k = f"admin_show_{s}"
+                if k in st.session_state:
+                    c[f"show_section_{s}"] = st.session_state[k]
+            save_config_to_json(c)
+            st.rerun()
+
+        order = cfg.get("page_section_order", list(PAGE_SECTION_IDS))
+        for i, sid in enumerate(order):
+            row = st.columns([3, 1, 1])
+            with row[0]:
+                vis = st.checkbox(
+                    PAGE_SECTION_LABELS.get(sid, sid),
+                    value=cfg.get(f"show_section_{sid}", True),
+                    key=f"admin_show_{sid}",
+                    on_change=_save_section_config,
+                )
+                cfg[f"show_section_{sid}"] = vis
+            with row[1]:
+                if st.button("↑", key=f"admin_up_{sid}", disabled=(i == 0)):
+                    order[i], order[i - 1] = order[i - 1], order[i]
+                    cfg["page_section_order"] = order
+                    for s in PAGE_SECTION_IDS:
+                        k = f"admin_show_{s}"
+                        if k in st.session_state:
+                            cfg[f"show_section_{s}"] = st.session_state[k]
+                    save_config_to_json(cfg)
+                    st.rerun()
+            with row[2]:
+                if st.button("↓", key=f"admin_down_{sid}", disabled=(i == len(order) - 1)):
+                    order[i], order[i + 1] = order[i + 1], order[i]
+                    cfg["page_section_order"] = order
+                    for s in PAGE_SECTION_IDS:
+                        k = f"admin_show_{s}"
+                        if k in st.session_state:
+                            cfg[f"show_section_{s}"] = st.session_state[k]
+                    save_config_to_json(cfg)
+                    st.rerun()
 
 cfg = get_dashboard_config()
 
@@ -755,49 +817,54 @@ if (
 st.markdown("---")
 
 # ============================================================================
-# DASHBOARD – всичко в един scroll (Evolution Index вграден, AI Analyst скрит)
+# ГЛАВНИ СЕКЦИИ – ред от Admin (page_section_order)
 # ============================================================================
-st.markdown('<p class="section-header">📈 Dashboard</p>', unsafe_allow_html=True)
-track_visit("Dashboard")
-df_agg, y_col, y_label = calculate_metric_data(
-    df=df_filtered,
-    products_list=products_on_chart,
-    periods=periods,
-    metric=metric,
-    df_full=df_raw,
-)
-df_agg_result = create_timeline_chart(
-    df_agg=df_agg, y_col=y_col, y_label=y_label, periods=periods,
-    sel_product=filters["product"], competitors=filters["competitors"],
-)
-if df_agg_result is not None and cfg.get("show_market_share", True):
-    if filters["region"] == "Всички":
-        show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
-    else:
-        df_regional_share = calculate_regional_market_share(
-            df=df_filtered, products_list=products_on_chart, periods=periods, period_col="Quarter"
+section_order = cfg.get("page_section_order", list(PAGE_SECTION_IDS))
+comp_level = "Национално ниво" if filters["region"] == "Всички" else f"Регионално: {filters['region']}"
+
+for sid in section_order:
+    if not cfg.get(f"show_section_{sid}", True):
+        continue
+    if sid == "dashboard":
+        st.markdown('<p class="section-header">📈 Dashboard</p>', unsafe_allow_html=True)
+        track_visit("Dashboard")
+        df_agg, y_col, y_label = calculate_metric_data(
+            df=df_filtered, products_list=products_on_chart, periods=periods,
+            metric=metric, df_full=df_raw,
         )
-        if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
-            show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
-
-st.markdown('<p class="section-header">🗺️ Разбивка по Brick (райони)</p>', unsafe_allow_html=True)
-create_brick_charts(
-    df=df_raw, products_list=products_on_chart, sel_product=filters["product"],
-    competitors=filters["competitors"], periods=periods,
-)
-
-st.markdown('<p class="section-header">⚖️ Сравнение по периоди и региони</p>', unsafe_allow_html=True)
-create_period_comparison(df=df_filtered, products_list=products_on_chart, periods=periods)
-st.divider()
-if periods:
-    create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1])
-
-st.markdown('<p class="section-header">📅 Последно vs Предишно тримесечие</p>', unsafe_allow_html=True)
-render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
-
-st.markdown('<p class="section-header">📊 Еволюционен Индекс</p>', unsafe_allow_html=True)
-track_visit("Evolution Index")
-render_evolution_index_tab(
-    df_filtered=df_filtered, df_national=df_raw, periods=periods,
-    filters=filters, period_col="Quarter",
-)
+        df_agg_result = create_timeline_chart(
+            df_agg=df_agg, y_col=y_col, y_label=y_label, periods=periods,
+            sel_product=filters["product"], competitors=filters["competitors"],
+        )
+        if df_agg_result is not None and cfg.get("show_market_share", True):
+            if filters["region"] == "Всички":
+                show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
+            else:
+                df_regional_share = calculate_regional_market_share(
+                    df=df_filtered, products_list=products_on_chart, periods=periods, period_col="Quarter"
+                )
+                if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
+                    show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
+    elif sid == "brick":
+        st.markdown('<p class="section-header">🗺️ Разбивка по Brick (райони)</p>', unsafe_allow_html=True)
+        create_brick_charts(
+            df=df_raw, products_list=products_on_chart, sel_product=filters["product"],
+            competitors=filters["competitors"], periods=periods,
+            selected_region=filters.get("region"),
+        )
+    elif sid == "comparison":
+        st.markdown('<p class="section-header">⚖️ Сравнение по периоди и региони</p>', unsafe_allow_html=True)
+        create_period_comparison(df=df_filtered, products_list=products_on_chart, periods=periods, level_label=comp_level)
+        st.divider()
+        if periods:
+            create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1], level_label=comp_level)
+    elif sid == "last_vs_prev":
+        st.markdown('<p class="section-header">📅 Последно vs Предишно тримесечие</p>', unsafe_allow_html=True)
+        render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
+    elif sid == "evolution_index":
+        st.markdown('<p class="section-header">📊 Еволюционен Индекс</p>', unsafe_allow_html=True)
+        track_visit("Evolution Index")
+        render_evolution_index_tab(
+            df_filtered=df_filtered, df_national=df_raw, periods=periods,
+            filters=filters, period_col="Quarter",
+        )
