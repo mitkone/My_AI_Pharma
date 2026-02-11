@@ -301,17 +301,6 @@ with st.expander("🔐 Admin login"):
 
 is_admin = st.session_state.get("is_admin", False)
 
-# Скриваме sidebar за не-admin потребители (mobile-first, чист landing)
-if not is_admin:
-    st.markdown(
-        """
-        <style>
-        [data-testid="stSidebar"] { display: none; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
 # ===== ADMIN PANEL (само за admin, в sidebar) =====
 if is_admin:
     # Логваме влизане в Admin секцията (веднъж на минута)
