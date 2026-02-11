@@ -295,7 +295,7 @@ with st.expander("🔐 Admin login"):
         if admin_password == "1234":
             st.session_state["is_admin"] = True
             st.success("Влезе в Admin режим. Sidebar Admin Panel е активен.")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Грешна парола.")
 
