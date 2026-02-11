@@ -81,7 +81,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
                         st.session_state[search_key] = drug
                         if "quick_search_drug" in st.session_state:
                             del st.session_state["quick_search_drug"]
-                        st.rerun()
+                        # НЕ викаме st.rerun() – кликът по бутона вече предизвиква rerun на приложението
         else:
             ui.caption("Няма съвпадения – опитай друго име")
     else:
