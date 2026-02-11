@@ -78,10 +78,9 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
                 with cols[i % 2]:
                     if ui.button(drug, key=f"sb_drug_btn_{drug}", use_container_width=True):
                         st.session_state["sb_product"] = drug
-                        st.session_state[search_key] = drug
                         if "quick_search_drug" in st.session_state:
                             del st.session_state["quick_search_drug"]
-                        # НЕ викаме st.rerun() – кликът по бутона вече предизвиква rerun на приложението
+                        st.rerun()
         else:
             ui.caption("Няма съвпадения – опитай друго име")
     else:
@@ -1004,11 +1003,11 @@ def render_last_vs_previous_quarter(
         st.success(f"🏆 **Топ регион по % ръст:** **{top_region}** ({top_growth:+.1f}%)")
 
     st.markdown("#### 🏅 Лидерборд по региони")
-    display_cols = ["Rank", "Region", "Last_Units", "Previous_Units", "Growth_%"]
-    merged_display = merged[display_cols].copy()
+    merged_display = merged[["Rank", "Region", "Growth_%", "Last_Units", "Previous_Units"]].copy()
+    merged_display["Growth_%"] = merged_display["Growth_%"].round(1)
     merged_display["Last_Units"] = merged_display["Last_Units"].astype(int)
     merged_display["Previous_Units"] = merged_display["Previous_Units"].astype(int)
-    merged_display["Growth_%"] = merged_display["Growth_%"].round(1)
+    merged_display = merged_display.rename(columns={"Growth_%": "Ръст %", "Last_Units": "Посл. опак.", "Previous_Units": "Предиш. опак."})
     st.dataframe(merged_display, use_container_width=True, hide_index=True)
 
     st.markdown("#### 📈 Ръст % по регион")
