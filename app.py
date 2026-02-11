@@ -208,7 +208,7 @@ def display_ai_insights(
 # ============================================================================
 
 st.set_page_config(
-    page_title="Market Analyst AI",
+    page_title="Pharma Analytics 2026",
     page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -235,10 +235,10 @@ st.markdown(hide_st_style, unsafe_allow_html=True)
 # ЗАГЛАВИЕ И ЗАРЕЖДАНЕ НА ДАННИ
 # ============================================================================
 
-st.title("📊 STADA Rx Sales Data")
+st.title("📱 Pharma Analytics 2026")
 st.markdown(
-    "**Регион** → **Медикамент** → **Brick** – "
-    "избери медикамент от общата база"
+    "Мобилен dashboard за екипи по продажби – "
+    "избери екип и медикамент за дълбок анализ."
 )
 
 # Един път зареждане; df_raw се подава по референция към всички табове
@@ -250,6 +250,31 @@ if df_raw.empty:
         "Няма Excel файлове (.xlsx) в папката. "
         "Добави ги и рестартирай приложението."
     )
+    st.stop()
+
+
+# ============================================================================
+# LANDING – Welcome & Team selection (скрива dashboard-а до избор на екип)
+# ============================================================================
+
+# Retro-fix: ако в master_data няма Team колона, маркираме всички редове като Team 2
+if "Team" not in df_raw.columns:
+    df_raw["Team"] = "Team 2"
+
+team_options = ["Избери екип...", "Team 1", "Team 2", "Team 3", "All Teams"]
+selected_team_label = st.selectbox("Екип", team_options, index=0, key="landing_team")
+
+if selected_team_label == "Избери екип...":
+    st.info("Моля, избери екип (Team 1, 2, 3 или All Teams), за да продължиш.")
+    st.stop()
+
+st.session_state["selected_team"] = selected_team_label
+
+if selected_team_label != "All Teams":
+    df_raw = df_raw[df_raw["Team"] == selected_team_label].copy()
+
+if df_raw.empty:
+    st.warning("Няма налични данни за избрания екип.")
     st.stop()
 
 
@@ -267,7 +292,7 @@ admin_password = st.sidebar.text_input(
     help="Само admin може да качва нови файлове"
 )
 
-is_admin = (admin_password == "110215")
+is_admin = (admin_password == "1234")
 
 # Показване на роля
 if is_admin:
@@ -283,7 +308,16 @@ if is_admin:
     track_visit("Admin")
 
     st.sidebar.header("⚙️ Admin Panel")
-    
+
+    # Team selector за качвания
+    admin_team = st.sidebar.selectbox(
+        "Team за този файл",
+        ["Team 1", "Team 2", "Team 3"],
+        index=1,
+        key="admin_upload_team",
+        help="Всеки качен файл ще бъде тагнат към избрания екип.",
+    )
+
     # File uploader за нови Excel файлове
     uploaded_file = st.sidebar.file_uploader(
         "📤 Качи нов Excel файл",
@@ -311,24 +345,32 @@ if is_admin:
                     # Обработваме файла
                     source_name = extract_source_name(uploaded_file.name)
                     df_new = robust_clean_excel(excel_path, source_name)
-                    
+
                     if not df_new.empty:
+                        # Добавяме Team колона за този upload
+                        df_new["Team"] = admin_team
+
                         # Зареждаме съществуващия master_data.csv
                         master_path = config.DATA_DIR / "master_data.csv"
-                        
+
                         if master_path.exists():
                             df_master = pd.read_csv(master_path)
+                            # Retro-fix: ако няма Team колона, маркираме старите данни като Team 2
+                            if "Team" not in df_master.columns:
+                                df_master["Team"] = "Team 2"
                             # Добавяме новите данни
                             df_updated = pd.concat([df_master, df_new], ignore_index=True)
                         else:
                             df_updated = df_new
-                        
+
                         # Премахваме дупликати
+                        subset_cols = ["Region", "Drug_Name", "District", "Quarter", "Source", "Team"]
+                        subset_cols = [c for c in subset_cols if c in df_updated.columns]
                         df_updated = df_updated.drop_duplicates(
-                            subset=["Region", "Drug_Name", "District", "Quarter", "Source"],
+                            subset=subset_cols,
                             keep="last"  # Запазваме най-новите
                         )
-                        
+
                         # Запазваме обновения master_data.csv
                         df_updated.to_csv(master_path, index=False, encoding="utf-8-sig")
                         
@@ -702,17 +744,19 @@ if (
 st.markdown("---")
 
 # ============================================================================
-# ТАБОВЕ – динамични: EI таб само ако show_evolution_index
+# НАВИГАЦИЯ – mobile-first: Dashboard / Evolution Index / AI Analyst
 # ============================================================================
 
-tab_names = ["📈 Dashboard", "🗺️ По Brick (райони)", "⚖️ Сравнение", "📅 Последно vs Предишно"]
-if cfg.get("show_evolution_index", True):
-    tab_names.append("📊 Еволюционен Индекс")
-tab_names.append("🤖 AI Analyst")
-tab_refs = st.tabs(tab_names)
-idx = 0
+nav_choice = st.radio(
+    "Избери секция",
+    ["📈 Dashboard", "📊 Evolution Index", "🤖 AI Analyst"],
+    horizontal=True,
+    key="main_nav",
+)
 
-with tab_refs[idx]:
+if nav_choice == "📈 Dashboard":
+    st.markdown("## 📈 Dashboard")
+    # Основен timeline + Market Share
     track_visit("Dashboard")
     df_agg, y_col, y_label = calculate_metric_data(
         df=df_filtered,
@@ -722,22 +766,33 @@ with tab_refs[idx]:
         df_full=df_raw,
     )
     df_agg_result = create_timeline_chart(
-        df_agg=df_agg, y_col=y_col, y_label=y_label, periods=periods,
-        sel_product=filters["product"], competitors=filters["competitors"],
+        df_agg=df_agg,
+        y_col=y_col,
+        y_label=y_label,
+        periods=periods,
+        sel_product=filters["product"],
+        competitors=filters["competitors"],
     )
-    if df_agg_result is not None:
-        if cfg.get("show_market_share", True):
-            show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
-            if filters["region"] != "Всички":
-                st.markdown("---")
-                df_regional_share = calculate_regional_market_share(
-                    df=df_filtered, products_list=products_on_chart, periods=periods, period_col="Quarter"
+    if df_agg_result is not None and cfg.get("show_market_share", True):
+        show_market_share_table(
+            df_agg_result, period_col="Quarter", is_national=True, key_suffix="national"
+        )
+        if filters["region"] != "Всички":
+            st.markdown("---")
+            df_regional_share = calculate_regional_market_share(
+                df=df_filtered, products_list=products_on_chart, periods=periods, period_col="Quarter"
+            )
+            if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
+                show_market_share_table(
+                    df_regional_share,
+                    period_col="Quarter",
+                    is_national=False,
+                    key_suffix="regional",
                 )
-                if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
-                    show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
-idx += 1
 
-with tab_refs[idx]:
+    # Brick view
+    st.markdown("---")
+    st.markdown("### 🗺️ По Brick (райони)")
     create_brick_charts(
         df=df_raw,
         products_list=products_on_chart,
@@ -745,32 +800,33 @@ with tab_refs[idx]:
         competitors=filters["competitors"],
         periods=periods,
     )
-idx += 1
 
-with tab_refs[idx]:
+    # Comparison view
+    st.markdown("---")
+    st.markdown("### ⚖️ Сравнение по периоди и региони")
     create_period_comparison(df=df_filtered, products_list=products_on_chart, periods=periods)
     st.divider()
     if periods:
         create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1])
-idx += 1
 
-with tab_refs[idx]:
+    # Last vs Previous
+    st.markdown("---")
+    st.markdown("### 📅 Последно vs Предишно тримесечие")
     render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
-idx += 1
 
-if cfg.get("show_evolution_index", True):
-    with tab_refs[idx]:
-        track_visit("Evolution Index")
-        render_evolution_index_tab(
-            df_filtered=df_filtered,
-            df_national=df_raw,
-            periods=periods,
-            filters=filters,
-            period_col="Quarter",
-        )
-    idx += 1
+elif nav_choice == "📊 Evolution Index":
+    st.markdown("## 📊 Evolution Index")
+    track_visit("Evolution Index")
+    render_evolution_index_tab(
+        df_filtered=df_filtered,
+        df_national=df_raw,
+        periods=periods,
+        filters=filters,
+        period_col="Quarter",
+    )
 
-with tab_refs[idx]:
+elif nav_choice == "🤖 AI Analyst":
+    st.markdown("## 🤖 AI Analyst")
     render_ai_analysis_tab(
         df=df_filtered,
         sel_product=filters["product"],
@@ -779,7 +835,7 @@ with tab_refs[idx]:
 
 
 # ============================================================================
-# ЕКСПОРТ НА ДАННИ
+# ЕКСПОРТ НА ДАННИ (само таблица; без отделен таб)
 # ============================================================================
 
 with st.expander("📋 Данни"):
@@ -790,5 +846,5 @@ st.download_button(
     "📥 Download CSV",
     data=csv,
     file_name="pharma_export.csv",
-    mime="text/csv"
+    mime="text/csv",
 )
