@@ -165,9 +165,20 @@ def load_all_excel_files(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
         Обединен DataFrame от всички файлове
     """
     frames = []
-    team_folders = getattr(config, "TEAM_FOLDERS", ["Team 1", "Team 2", "Team 3"])
+    master_file = data_dir / "master_data.csv"
 
-    # 1. Зареждане от папки по екипи – всеки екип си има папка, данните НЕ се губята
+    # 1. master_data.csv има приоритет (Admin качва тук)
+    if master_file.exists():
+        try:
+            logger.info("✓ Зареждане от master_data.csv")
+            df = pd.read_csv(master_file)
+            logger.info(f"✓ Заредени {len(df):,} реда")
+            return df
+        except Exception as e:
+            logger.warning(f"Грешка при master_data.csv: {e}")
+
+    team_folders = getattr(config, "TEAM_FOLDERS", ["Team 1", "Team 2", "Team 3"])
+    # 2. Папки по екипи
     for team_name in team_folders:
         team_dir = data_dir / team_name
         if team_dir.is_dir():
@@ -181,21 +192,10 @@ def load_all_excel_files(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
                         frames.append(df)
     if frames:
         combined = pd.concat(frames, ignore_index=True)
-        logger.info(f"✓ Заредени {len(frames)} файла от папки по екипи: {len(combined):,} реда")
+        logger.info(f"✓ Заредени {len(frames)} файла от папки: {len(combined):,} реда")
         return combined
 
-    # 2. master_data.csv (обратна съвместимост)
-    master_file = data_dir / "master_data.csv"
-    if master_file.exists():
-        try:
-            logger.info("✓ Зареждане от master_data.csv")
-            df = pd.read_csv(master_file)
-            logger.info(f"✓ Заредени {len(df):,} реда от master_data.csv")
-            return df
-        except Exception as e:
-            logger.warning(f"Грешка при четене на master_data.csv: {e}")
-
-    # 3. Excel в корена на data/ (старо – всичко е Team 2)
+    # 3. Excel в корена (старо – всичко е Team 2)
     logger.info(f"Сканиране за Excel в {data_dir}")
     excel_files = [
         f for f in list(data_dir.glob("*.xlsx")) + list(data_dir.glob("*.xls"))
