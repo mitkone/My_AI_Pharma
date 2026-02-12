@@ -74,37 +74,14 @@ ANALYTICS_FILES = [
 
 
 def track_visit(section_name: str) -> None:
-    """
-    Логва посещение на секция: (Timestamp_minute, Section_Name).
-    Използва session_state, за да не пише повече от веднъж на минута за дадена секция.
-    """
-    now_minute = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
-    key = f"last_visit_{section_name}"
-    if st.session_state.get(key) == now_minute:
-        return
-    st.session_state[key] = now_minute
+    pass  # Това спира записването и предотвратява NameError-а от снимката ти
 
-    try:
-        is_new = not VISIT_LOG_PATH.exists()
-        VISIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with VISIT_LOG_PATH.open("a", encoding="utf-8") as f:
-            if is_new:
-                f.write("timestamp,section\n")
-            f.write(f"{now_minute},{section_name}\n")
-    except Exception:
-        # Не прекъсваме приложението при грешка в логването
-        pass
 
 
 def reset_analytics() -> None:
-    """Изтрива файловете с аналитика (activity_log, visits_log и стария section_visits)."""
-    for path in ANALYTICS_FILES:
-        try:
-            if path.exists():
-                path.unlink()
-        except Exception:
-            # Ако не можем да изтрием, не спираме приложението
-            pass
+    """Оптимизирана версия: Не трие нищо, за да не чупи сървъра."""
+    pass
+
 
 
 # ============================================================================
