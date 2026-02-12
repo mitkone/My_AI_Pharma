@@ -77,16 +77,17 @@ def track_visit(
     section_name: str,
     team: str = None,
     product: str = None,
+    region: str = None,
     skip_if_admin: bool = True,
 ) -> None:
     """
-    Логва посещение – само ако потребителят НЕ е admin (когато skip_if_admin=True).
-    Тротълване: max 1 запис на минута за същата (section, team, product).
+    Логва посещение – само ако потребителят НЕ е admin.
+    Тротълване: max 1 запис на минута за същата (section, team, product, region).
     """
     if skip_if_admin and st.session_state.get("is_admin", False):
         return
     now_minute = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
-    key = f"_visit_{section_name}_{team or ''}_{product or ''}"
+    key = f"_visit_{section_name}_{team or ''}_{product or ''}_{region or ''}"
     if st.session_state.get(key) == now_minute:
         return
     st.session_state[key] = now_minute
@@ -95,8 +96,8 @@ def track_visit(
         is_new = not VISIT_LOG_PATH.exists()
         with VISIT_LOG_PATH.open("a", encoding="utf-8") as f:
             if is_new:
-                f.write("timestamp,section,team,product\n")
-            f.write(f"{now_minute},{section_name},{team or ''},{product or ''}\n")
+                f.write("timestamp,section,team,product,region\n")
+            f.write(f"{now_minute},{section_name},{team or ''},{product or ''},{region or ''}\n")
     except Exception:
         pass
 
@@ -114,15 +115,15 @@ def reset_analytics() -> None:
 def _load_analytics_df() -> pd.DataFrame:
     """Зарежда visits_log като DataFrame (за Admin таблиците)."""
     if not VISIT_LOG_PATH.exists():
-        return pd.DataFrame(columns=["timestamp", "section", "team", "product"])
+        return pd.DataFrame(columns=["timestamp", "section", "team", "product", "region"])
     try:
         df = pd.read_csv(VISIT_LOG_PATH)
-        for col in ["team", "product"]:
+        for col in ["team", "product", "region"]:
             if col not in df.columns:
                 df[col] = ""
         return df
     except Exception:
-        return pd.DataFrame(columns=["timestamp", "section", "team", "product"])
+        return pd.DataFrame(columns=["timestamp", "section", "team", "product", "region"])
 
 
 
@@ -428,15 +429,23 @@ if is_admin:
         total_views = len(df_v) if not df_v.empty else 0
         st.metric("Общо гледания", total_views)
 
-        if not df_v.empty and "team" in df_v.columns and "product" in df_v.columns:
-            st.markdown("**По екипи**")
-            team_counts = df_v[df_v["team"].astype(str).str.strip() != ""].groupby("team").size().sort_values(ascending=False)
-            if not team_counts.empty:
-                df_teams = pd.DataFrame({"Екип": team_counts.index, "Брой гледания": team_counts.values})
-                st.dataframe(df_teams, use_container_width=True, hide_index=True)
-            else:
-                st.caption("Няма данни по екипи.")
-
+        if not df_v.empty:
+            if "region" in df_v.columns:
+                reg_counts = df_v[df_v["region"].astype(str).str.strip() != ""].groupby("region").size().sort_values(ascending=False)
+                if not reg_counts.empty:
+                    st.markdown("**По региони**")
+                    df_reg = pd.DataFrame({"Регион": reg_counts.index, "Брой гледания": reg_counts.values})
+                    st.dataframe(df_reg, use_container_width=True, hide_index=True)
+                else:
+                    st.caption("Няма данни по региони.")
+            if "team" in df_v.columns:
+                st.markdown("**По екипи**")
+                team_counts = df_v[df_v["team"].astype(str).str.strip() != ""].groupby("team").size().sort_values(ascending=False)
+                if not team_counts.empty:
+                    df_teams = pd.DataFrame({"Екип": team_counts.index, "Брой гледания": team_counts.values})
+                    st.dataframe(df_teams, use_container_width=True, hide_index=True)
+                else:
+                    st.caption("Няма данни по екипи.")
             st.markdown("**По медикаменти (и екип)**")
             df_prod = df_v[(df_v["product"].astype(str).str.strip() != "") & (df_v["team"].astype(str).str.strip() != "")]
             if not df_prod.empty:
@@ -831,7 +840,7 @@ for sid in section_order:
         continue
     if sid == "dashboard":
         st.markdown('<p class="section-header">📈 Dashboard</p>', unsafe_allow_html=True)
-        track_visit("Dashboard", team=selected_team_label, product=filters.get("product"))
+        track_visit("Dashboard", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         df_agg, y_col, y_label = calculate_metric_data(
             df=df_filtered, products_list=products_on_chart, periods=periods,
             metric=metric, df_full=df_raw,
@@ -851,7 +860,7 @@ for sid in section_order:
                     show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
     elif sid == "brick":
         st.markdown('<p class="section-header">🗺️ Разбивка по Brick (райони)</p>', unsafe_allow_html=True)
-        track_visit("Brick", team=selected_team_label, product=filters.get("product"))
+        track_visit("Brick", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         create_brick_charts(
             df=df_raw, products_list=products_on_chart, sel_product=filters["product"],
             competitors=filters["competitors"], periods=periods,
@@ -859,16 +868,16 @@ for sid in section_order:
         )
     elif sid == "comparison":
         st.markdown('<p class="section-header">⚖️ Сравнение на региони</p>', unsafe_allow_html=True)
-        track_visit("Сравнение", team=selected_team_label, product=filters.get("product"))
+        track_visit("Сравнение", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         if periods:
             create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1], level_label=comp_level, periods_fallback=periods)
     elif sid == "last_vs_prev":
         st.markdown('<p class="section-header">📅 Последно vs Предишно тримесечие</p>', unsafe_allow_html=True)
-        track_visit("Посл. vs Предиш.", team=selected_team_label, product=filters.get("product"))
+        track_visit("Посл. vs Предиш.", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
     elif sid == "evolution_index":
         st.markdown('<p class="section-header">📊 Еволюционен Индекс</p>', unsafe_allow_html=True)
-        track_visit("Evolution Index", team=selected_team_label, product=filters.get("product"))
+        track_visit("Evolution Index", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         render_evolution_index_tab(
             df_filtered=df_filtered, df_national=df_raw, periods=periods,
             filters=filters, period_col="Quarter",
