@@ -572,8 +572,10 @@ if not selected_drug:
     st.stop()
 
 st.session_state["quick_search_drug"] = selected_drug
-st.session_state["sb_product"] = selected_drug
 st.session_state["sb_product_search"] = selected_drug
+# sb_product се задава в create_filters чрез default_product – не го пипаме тук,
+# за да избегнем Streamlit warning: "widget with key sb_product was created with
+# default value but also had its value set via Session State API"
 st.success(f"✅ Избран: **{selected_drug}**")
 periods_temp = get_sorted_periods(df_raw)
 drug_data = df_raw[df_raw["Drug_Name"] == selected_drug].copy()

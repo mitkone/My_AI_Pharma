@@ -48,13 +48,15 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
         key="sb_region",
     )
     
-    # 2. Медикамент (основен продукт) – selectbox за лесна смяна (без допълнителни бутони)
-    if "sb_product" not in st.session_state:
-        st.session_state["sb_product"] = default_product if (default_product and default_product in drugs) else (drugs[0] if drugs else "")
-    if default_product and default_product in drugs and st.session_state.get("quick_search_drug") == default_product:
-        st.session_state["sb_product"] = default_product
-
-    idx = drugs.index(st.session_state["sb_product"]) if st.session_state["sb_product"] in drugs else 0
+    # 2. Медикамент (основен продукт) – selectbox за лесна смяна
+    # Не задаваме session_state["sb_product"] преди виджета – само изчисляваме index,
+    # за да избегнем Streamlit warning за "default value + Session State API"
+    if default_product and default_product in drugs:
+        idx = drugs.index(default_product)
+    elif st.session_state.get("sb_product") in drugs:
+        idx = drugs.index(st.session_state["sb_product"])
+    else:
+        idx = 0
     sel_product = ui.selectbox(
         "2. Медикамент (основен)",
         drugs,
