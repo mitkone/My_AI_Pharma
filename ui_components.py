@@ -959,12 +959,14 @@ def create_brick_charts(
             )
             if res and not res["merged"].empty:
                 m = res["merged"].sort_values("Growth_%", ascending=True)
+                m["Units_Delta"] = m["Last_Units"] - m["Previous_Units"]
                 lbl = "Брик" if grp_col == "District" else "Регион"
+                txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(m["Growth_%"], m["Units_Delta"])]
                 fig_g = px.bar(
                     m, x="Growth_%", y="Region", orientation="h",
                     color="Growth_%", color_continuous_scale=["#e74c3c", "#95a5a6", "#2ecc71"],
                     range_color=[min(m["Growth_%"].min(), -1), max(m["Growth_%"].max(), 1)],
-                    text=[f"{x:+.1f}%" for x in m["Growth_%"]],
+                    text=txts,
                     title=f"Ръст % по {lbl} – {sel_product} ({res['last_period']} vs {res['prev_period']})",
                 )
                 fig_g.update_traces(textposition="outside")
@@ -1020,12 +1022,15 @@ def render_last_vs_previous_quarter(
     merged_chart = merged.sort_values("Growth_%", ascending=True)
     colors = ["#2ecc71" if x >= 0 else "#e74c3c" for x in merged_chart["Growth_%"]]
     fig = go.Figure()
+    merged_chart = merged_chart.copy()
+    merged_chart["Units_Delta"] = merged_chart["Last_Units"] - merged_chart["Previous_Units"]
+    txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(merged_chart["Growth_%"], merged_chart["Units_Delta"])]
     fig.add_trace(go.Bar(
         x=merged_chart["Growth_%"],
         y=merged_chart["Region"],
         orientation="h",
         marker_color=colors,
-        text=[f"{x:+.1f}%" for x in merged_chart["Growth_%"]],
+        text=txts,
         textposition="outside",
         textfont=dict(size=11),
     ))

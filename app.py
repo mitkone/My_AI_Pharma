@@ -188,44 +188,33 @@ def display_ai_insights(
             st.info("AI Insights Summary: Няма достатъчно данни за анализ за текущите филтри.")
         return
 
-    # UI контейнер – Executive Briefing
-    with st.container():
-        st.markdown(
-            f"""
-            <div style="
-                border-radius: 10px;
-                padding: 16px 20px;
-                margin-bottom: 16px;
-                background: linear-gradient(90deg, #0f172a, #020617);
-                border: 1px solid #1f2937;
-            ">
-              <h3 style="margin: 0 0 6px 0; font-size: 18px;">
-                🧠 AI Insights Summary
-              </h3>
-              <p style="margin: 0 0 10px 0; font-size: 13px; opacity: 0.8;">
-                Executive briefing за <b>{product}</b> на база последните данни.
-              </p>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Съдържание – при регион: брикове; при Всички: региони
-        lines = []
-        label_best = "Най-добър брик" if use_bricks else "Най-добър регион"
-        label_worst = "Най-слаб брик" if use_bricks else "Най-слаб регион"
-        if best_region is not None:
-            lines.append(f"- **{label_best} (ръст Units):** {best_region} ({best_growth:+.1f}%)")
-        if worst_region is not None:
-            lines.append(f"- **{label_worst} (ръст Units):** {worst_region} ({worst_growth:+.1f}%)")
-        if avg_ei is not None:
-            lines.append(f"- **Среден Еволюционен Индекс (EI):** {avg_ei:.1f}")
-
-        if lines:
-            st.markdown("\n".join(lines))
-        else:
-            st.markdown("_Няма достатъчно данни за изчисляване на показателите._")
-
-        st.markdown("</div>", unsafe_allow_html=True)
+    # UI контейнер – Executive Briefing (всичко в един компактен панел)
+    parts = []
+    label_best = "Най-добър брик" if use_bricks else "Най-добър регион"
+    label_worst = "Най-слаб брик" if use_bricks else "Най-слаб регион"
+    if best_region is not None:
+        parts.append(f"{label_best}: <b>{best_region}</b> ({best_growth:+.1f}%)")
+    if worst_region is not None:
+        parts.append(f"{label_worst}: <b>{worst_region}</b> ({worst_growth:+.1f}%)")
+    if avg_ei is not None:
+        parts.append(f"Среден EI: <b>{avg_ei:.1f}</b>")
+    stats_html = " &nbsp;|&nbsp; ".join(parts) if parts else "Няма достатъчно данни"
+    st.markdown(
+        f"""
+        <div style="
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+            background: linear-gradient(90deg, #0f172a, #020617);
+            border: 1px solid #1f2937;
+        ">
+          <span style="font-size: 16px; font-weight: 600;">🧠 AI Insights</span>
+          <span style="font-size: 13px; opacity: 0.85; margin-left: 8px;">{product}</span>
+          <p style="margin: 8px 0 0 0; font-size: 13px; line-height: 1.4;">{stats_html}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # ============================================================================
@@ -664,6 +653,12 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                 last_period = periods[-1]
                 prev_period = periods[-2]
                 last_units = selected_product_data[selected_product_data["Quarter"] == last_period]["Units"].sum()
+                if last_units == 0:
+                    product_periods = get_sorted_periods(selected_product_data, "Quarter")
+                    if len(product_periods) >= 2:
+                        last_period = product_periods[-1]
+                        prev_period = product_periods[-2]
+                        last_units = selected_product_data[selected_product_data["Quarter"] == last_period]["Units"].sum()
                 prev_units = selected_product_data[selected_product_data["Quarter"] == prev_period]["Units"].sum()
                 if prev_units > 0:
                     growth_pct = ((last_units - prev_units) / prev_units) * 100
@@ -707,14 +702,19 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                 region_label = filters["region"] if filters["region"] != "Всички" else "Всички региони"
                 brick_label = filters["district"] if filters.get("district") and filters["district"] != "Всички" else "Всички Брикове"
                 ms_label = "MS (регион)" if filters["region"] != "Всички" else "MS (нац.)"
-                st.markdown('<p class="section-header">📊 Ключови показатели</p>', unsafe_allow_html=True)
-                st.caption(f"📍 **{region_label}** | **Брик:** {brick_label}")
-                k1, k2, k3, k4 = st.columns(4)
-                with k1: st.metric("Продажби", f"{int(last_units):,}", f"{growth_pct:+.1f}%")
-                with k2: st.metric(ms_label, f"{market_share_pct:.2f}%", None)
-                with k3: st.metric("Региони", str(regions_count), None)
-                with k4:
-                    st.metric("Промяна", f"{abs(growth_units):,}", f"{growth_pct:+.1f}%", delta_color="normal")
+                st.markdown(
+                    f'<div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 12px; '
+                    f'padding: 1.2rem 1.5rem; margin-bottom: 1rem; border: 1px solid #334155;">'
+                    f'<p style="margin: 0 0 12px 0; font-size: 1.1rem; font-weight: 600;">📊 Ключови показатели</p>'
+                    f'<p style="margin: 0 0 14px 0; font-size: 0.95rem; opacity: 0.9;">📍 {region_label} | Брик: {brick_label} | Период: {last_period}</p>'
+                    f'<div style="display: flex; gap: 2rem; flex-wrap: wrap;">'
+                    f'<span style="font-size: 1.25rem;"><b>Продажби:</b> {int(last_units):,} <span style="color: {"#22c55e" if growth_pct >= 0 else "#ef4444"};">({growth_pct:+.1f}%)</span></span>'
+                    f'<span style="font-size: 1.25rem;"><b>{ms_label}:</b> {market_share_pct:.2f}%</span>'
+                    f'<span style="font-size: 1.25rem;"><b>Региони:</b> {regions_count}</span>'
+                    f'<span style="font-size: 1.25rem;"><b>Промяна:</b> {growth_units:+,} оп.</span>'
+                    f'</div></div>',
+                    unsafe_allow_html=True,
+                )
 
         elif comp_id == "ai_insights":
             display_ai_insights(df_raw, df_filtered, filters, periods)

@@ -293,14 +293,18 @@ def create_regional_comparison(
                 pivot_growth[col] = 0
         pivot_growth["_tot"] = pivot_growth[[c for c in pivot_growth.columns if c in products_list]].sum(axis=1)
         pivot_growth = pivot_growth.sort_values("_tot", ascending=False).drop(columns=["_tot"])
+        pivot_prev_reidx = pivot_prev.reindex(pivot.index).fillna(0)
         fig2 = go.Figure()
         for product in products_list:
             if product in pivot_growth.columns:
+                pct = pivot_growth[product]
+                delta_vals = (pivot[product] - pivot_prev_reidx[product]).reindex(pivot_growth.index).fillna(0) if product in pivot.columns else pd.Series(0.0, index=pivot_growth.index)
+                txt = [f"{p:+.1f}% ({d:+,.0f} оп.)" for p, d in zip(pct, delta_vals)]
                 fig2.add_trace(go.Bar(
                     name=product,
                     x=pivot_growth.index,
                     y=pivot_growth[product],
-                    text=pivot_growth[product].apply(lambda x: f"{x:+.1f}%" if pd.notna(x) else ""),
+                    text=txt,
                     textposition='outside',
                 ))
         fig2.add_hline(y=0, line_dash="dash", line_color="gray")
