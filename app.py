@@ -73,7 +73,7 @@ ANALYTICS_FILES = [
 ]
 
 
-            def track_visit(section_name: str) -> None:
+def track_visit(section_name: str) -> None:
     pass  # Това спира записването и предотвратява NameError-а от снимката ти
 
 
