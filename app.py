@@ -798,28 +798,33 @@ st.markdown("---")
 section_order = cfg.get("page_section_order", list(PAGE_SECTION_IDS))
 comp_level = "Национално ниво" if filters["region"] == "Всички" else f"Регионално: {filters['region']}"
 
-# При избран регион: показваме инфо блок и преместваме Brick нагоре
+# Голям видим блок: в кой регион сме (Всички или избран)
 sel_region = filters.get("region", "Всички")
 if sel_region and sel_region != "Всички":
     df_reg = df_raw[df_raw["Region"] == sel_region]
     if not df_reg.empty:
         bricks = df_reg["District"].dropna().unique() if "District" in df_reg.columns else []
         n_bricks = len(bricks)
-        top3 = []
-        if periods and "District" in df_reg.columns:
-            last_p = periods[-1]
-            top_df = df_reg[df_reg["Quarter"] == last_p].groupby("District")["Units"].sum().sort_values(ascending=False).head(3)
-            top3 = list(top_df.index)
-        parts = [f"📍 **Регион:** {sel_region}", f"**{n_bricks}** брикове"]
-        if top3:
-            parts.append(f"Топ 3: {', '.join(top3)}")
-        st.info(" | ".join(parts))
+        st.markdown(
+            f'<div style="background: linear-gradient(90deg, #1e3a5f, #0f172a); border-radius: 12px; padding: 1.2rem 1.5rem; '
+            f'margin-bottom: 1rem; border: 1px solid #334155;"><p style="margin: 0; font-size: 1.3rem; font-weight: 600;">'
+            f'📍 Регион: <span style="color: #60a5fa;">{sel_region}</span></p>'
+            f'<p style="margin: 0.4rem 0 0 0; font-size: 1rem; opacity: 0.9;">{n_bricks} брикове в региона</p></div>',
+            unsafe_allow_html=True,
+        )
     # Brick секцията отива преди Dashboard при регионален фокус
     if "brick" in section_order and "dashboard" in section_order:
         bi, di = section_order.index("brick"), section_order.index("dashboard")
         if bi > di:
             section_order = [s for s in section_order if s != "brick"]
             section_order.insert(di, "brick")
+else:
+    st.markdown(
+        '<div style="background: linear-gradient(90deg, #1e3a5f, #0f172a); border-radius: 12px; padding: 1.2rem 1.5rem; '
+        'margin-bottom: 1rem; border: 1px solid #334155;"><p style="margin: 0; font-size: 1.3rem; font-weight: 600;">'
+        '📍 Регион: <span style="color: #60a5fa;">Всички (национален преглед)</span></p></div>',
+        unsafe_allow_html=True,
+    )
 
 for sid in section_order:
     if not cfg.get(f"show_section_{sid}", True):

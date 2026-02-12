@@ -48,46 +48,20 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
         key="sb_region",
     )
     
-    # 2. Медикамент (основен продукт) – търсене с предложения, избор с клик (без Enter)
+    # 2. Медикамент (основен продукт) – selectbox за лесна смяна (без допълнителни бутони)
     if "sb_product" not in st.session_state:
         st.session_state["sb_product"] = default_product if (default_product and default_product in drugs) else (drugs[0] if drugs else "")
     if default_product and default_product in drugs and st.session_state.get("quick_search_drug") == default_product:
         st.session_state["sb_product"] = default_product
-        st.session_state["sb_product_search"] = default_product
-    
-    search_key = "sb_product_search"
-    current_selected = st.session_state["sb_product"]
-    search_placeholder = current_selected or "Пиши име на медикамент..."
-    # Инициализация само при първо зареждане (виджетът с key= управлява стойността си)
-    if search_key not in st.session_state:
-        st.session_state[search_key] = current_selected or ""
-    search_val = ui.text_input(
+
+    idx = drugs.index(st.session_state["sb_product"]) if st.session_state["sb_product"] in drugs else 0
+    sel_product = ui.selectbox(
         "2. Медикамент (основен)",
-        placeholder=search_placeholder,
-        help="Пиши за търсене – избираш с клик върху предложение (не е нужен Enter)",
-        key=search_key,
+        drugs,
+        index=idx,
+        help="Избери или смени медикамент от падащия списък",
+        key="sb_product",
     )
-    search_term = (search_val or "").strip().lower()
-    
-    # Показвай бутоните само при търсене И когато избраният медикамент още не съвпада с резултата
-    if search_term:
-        matched = [d for d in drugs if search_term in d.lower()][:20]
-        if matched:
-            # Скрий бутоните ако потребителят вече е избрал (единствено съвпадение = текущия избор)
-            already_selected = len(matched) == 1 and matched[0] == current_selected
-            if not already_selected:
-                cols = ui.columns(2)
-                for i, drug in enumerate(matched):
-                    with cols[i % 2]:
-                        if ui.button(drug, key=f"sb_drug_btn_{drug}", use_container_width=True):
-                            st.session_state["sb_product"] = drug
-                            if "quick_search_drug" in st.session_state:
-                                del st.session_state["quick_search_drug"]
-                            st.rerun()
-        else:
-            ui.caption("Няма съвпадения – опитай друго име")
-    
-    sel_product = st.session_state["sb_product"]
     
     # 3. Brick (район)
     sel_district = ui.selectbox(
@@ -996,9 +970,10 @@ def create_brick_charts(
                 fig_g.update_traces(textposition="outside")
                 fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
                 fig_g.update_layout(
-                    height=max(350, len(m) * 24), showlegend=False,
+                    height=max(450, len(m) * 36), showlegend=False,
                     xaxis_title="Ръст (%)", yaxis_title=lbl, coloraxis_showscale=False,
-                    margin=dict(l=80, r=80), dragmode=False,
+                    margin=dict(l=120, r=100), dragmode=False,
+                    yaxis=dict(tickfont=dict(size=14)), xaxis=dict(tickfont=dict(size=12)),
                 )
                 st.plotly_chart(fig_g, use_container_width=True, config=config.PLOTLY_CONFIG)
             else:
@@ -1039,17 +1014,7 @@ def render_last_vs_previous_quarter(
     top_growth = result["top_growth"]
 
     st.subheader("📊 Последно vs Предишно тримесечие")
-    st.caption(f"**Продукт:** {selected_product} | **Периоди:** {last_period} (текущ) vs {prev_period} (предишен) | Ръст на продажби (Units) по регион.")
-    if top_region is not None and top_growth is not None:
-        st.success(f"🏆 **Топ регион по % ръст:** **{top_region}** ({top_growth:+.1f}%)")
-
-    st.markdown("#### 🏅 Лидерборд по региони")
-    merged_display = merged[["Rank", "Region", "Growth_%", "Last_Units", "Previous_Units"]].copy()
-    merged_display["Growth_%"] = merged_display["Growth_%"].round(1)
-    merged_display["Last_Units"] = merged_display["Last_Units"].astype(int)
-    merged_display["Previous_Units"] = merged_display["Previous_Units"].astype(int)
-    merged_display = merged_display.rename(columns={"Growth_%": "Ръст %", "Last_Units": "Посл. опак.", "Previous_Units": "Предиш. опак."})
-    st.dataframe(merged_display, use_container_width=True, hide_index=True)
+    st.caption(f"**Продукт:** {selected_product} | **Периоди:** {last_period} (текущ) vs {prev_period} (предишен)")
 
     st.markdown("#### 📈 Ръст % по регион")
     merged_chart = merged.sort_values("Growth_%", ascending=True)
@@ -1068,10 +1033,11 @@ def render_last_vs_previous_quarter(
     fig.update_layout(
         xaxis_title="Ръст (%)",
         yaxis_title="Регион",
-        height=max(400, len(merged_chart) * 28),
-        margin=dict(l=80, r=80, t=20, b=40),
+        height=max(450, len(merged_chart) * 36),
+        margin=dict(l=120, r=100, t=20, b=40),
         showlegend=False,
         dragmode=False,
-        yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist()),
+        yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist(), tickfont=dict(size=14)),
+        xaxis=dict(tickfont=dict(size=12)),
     )
     st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)

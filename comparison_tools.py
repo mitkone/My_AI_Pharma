@@ -225,13 +225,6 @@ def create_regional_comparison(
     if level_label:
         st.caption(f"📍 **Ниво:** {level_label}")
 
-    view_mode = st.radio(
-        "Покажи по",
-        ["Опаковки", "Ръст % (спрямо предишно трим.)"],
-        horizontal=True,
-        key="regional_comp_view",
-    )
-
     # Филтриране по период – fallback
     df_period = df[df[period_col] == period]
     df_prod = df_period[df_period["Drug_Name"].isin(products_list)] if not df_period.empty else pd.DataFrame()
@@ -256,94 +249,74 @@ def create_regional_comparison(
     pivot["Total"] = pivot.sum(axis=1)
     pivot = pivot.sort_values("Total", ascending=False).drop(columns=["Total"])
 
-    if view_mode == "Ръст % (спрямо предишно трим.)":
-        # Изчисляваме ръст % за всеки продукт по регион
-        prev_period = None
-        if periods_fallback and period in periods_fallback:
-            idx = periods_fallback.index(period)
-            if idx > 0:
-                prev_period = periods_fallback[idx - 1]
-        if prev_period is None:
-            st.info("Няма предишен период за ръст.")
-            return
-        df_prev = df[df[period_col] == prev_period]
-        if df_prev.empty:
-            st.info("Няма данни за предишния период.")
-            return
-        agg_prev = df_prev[df_prev["Drug_Name"].isin(products_list)].groupby(["Region", "Drug_Name"])["Units"].sum().reset_index()
+    # 1. Графика за опаковки
+    fig = go.Figure()
+    for product in products_list:
+        if product in pivot.columns:
+            fig.add_trace(go.Bar(
+                name=product,
+                x=pivot.index,
+                y=pivot[product],
+                text=pivot[product].apply(lambda x: f"{int(x):,}" if x > 0 else ""),
+                textposition='inside',
+            ))
+    fig.update_layout(
+        title=f"Регионално разпределение - {period}",
+        legend_title="",
+        xaxis=dict(title="Регион", tickangle=-45, title_font=dict(size=14), tickfont=dict(size=14), autorange=True),
+        yaxis=dict(title="Опаковки", title_font=dict(size=14), tickfont=dict(size=14), autorange=True),
+        barmode='stack',
+        height=config.MOBILE_CHART_HEIGHT,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5),
+        hovermode='closest', dragmode=False, margin=dict(l=0, r=0, t=30, b=0), font=dict(size=12),
+    )
+    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
+
+    # 2. Графика за ръст % под опаковките (като в секция Опаковки по Brick)
+    st.markdown("#### 📈 Ръст % спрямо предишно тримесечие")
+    prev_period = None
+    if periods_fallback and period in periods_fallback:
+        idx = periods_fallback.index(period)
+        if idx > 0:
+            prev_period = periods_fallback[idx - 1]
+    if prev_period and not df[df[period_col] == prev_period].empty:
+        agg_prev = df[df[period_col] == prev_period]
+        agg_prev = agg_prev[agg_prev["Drug_Name"].isin(products_list)].groupby(["Region", "Drug_Name"])["Units"].sum().reset_index()
         pivot_prev = agg_prev.pivot(index="Region", columns="Drug_Name", values="Units").fillna(0)
-        for col in pivot.columns:
+        pivot_growth = pivot.copy()
+        for col in pivot_growth.columns:
             if col in pivot_prev.columns:
                 prev_vals = pivot_prev[col].reindex(pivot.index).fillna(0)
                 curr_vals = pivot[col]
-                growth = np.where(prev_vals > 0, ((curr_vals - prev_vals) / prev_vals * 100), np.where(curr_vals > 0, 100.0, 0.0))
-                pivot[col] = growth
+                pivot_growth[col] = np.where(prev_vals > 0, ((curr_vals - prev_vals) / prev_vals * 100), np.where(curr_vals > 0, 100.0, 0.0))
             else:
-                pivot[col] = 0
-        pivot["Total"] = pivot[[c for c in pivot.columns if c in products_list]].sum(axis=1)
-        pivot = pivot.sort_values("Total", ascending=False).drop(columns=["Total"], errors="ignore")
-        fig = go.Figure()
+                pivot_growth[col] = 0
+        pivot_growth["_tot"] = pivot_growth[[c for c in pivot_growth.columns if c in products_list]].sum(axis=1)
+        pivot_growth = pivot_growth.sort_values("_tot", ascending=False).drop(columns=["_tot"])
+        fig2 = go.Figure()
         for product in products_list:
-            if product in pivot.columns:
-                fig.add_trace(go.Bar(
+            if product in pivot_growth.columns:
+                fig2.add_trace(go.Bar(
                     name=product,
-                    x=pivot.index,
-                    y=pivot[product],
-                    text=pivot[product].apply(lambda x: f"{x:+.1f}%" if pd.notna(x) else ""),
+                    x=pivot_growth.index,
+                    y=pivot_growth[product],
+                    text=pivot_growth[product].apply(lambda x: f"{x:+.1f}%" if pd.notna(x) else ""),
                     textposition='outside',
                 ))
-        fig.add_hline(y=0, line_dash="dash", line_color="gray")
-        fig.update_layout(
+        fig2.add_hline(y=0, line_dash="dash", line_color="gray")
+        n_reg = len(pivot_growth)
+        fig2.update_layout(
             title=f"Ръст % по регион – {period} vs {prev_period}",
             yaxis_title="Ръст (%)",
             barmode='group',
-            height=config.MOBILE_CHART_HEIGHT,
+            height=max(500, n_reg * 38),
             legend_title="",
-            xaxis=dict(title="Регион", tickangle=-45, title_font=dict(size=14), tickfont=dict(size=14)),
+            xaxis=dict(title="Регион", tickangle=-45, tickfont=dict(size=14)),
+            yaxis=dict(tickfont=dict(size=13)),
             legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5),
-            margin=dict(l=0, r=0, t=30, b=0), font=dict(size=12),
+            margin=dict(l=80, r=80, t=40, b=80),
+            font=dict(size=12),
         )
+        st.plotly_chart(fig2, use_container_width=True, config=config.PLOTLY_CONFIG)
     else:
-        fig = go.Figure()
-        for product in products_list:
-            if product in pivot.columns:
-                fig.add_trace(go.Bar(
-                    name=product,
-                    x=pivot.index,
-                    y=pivot[product],
-                    text=pivot[product].apply(lambda x: f"{int(x):,}" if x > 0 else ""),
-                    textposition='inside',
-                ))
-        fig.update_layout(
-            title=f"Регионално разпределение - {period}",
-            legend_title="",
-            xaxis=dict(
-            title="Регион",
-            tickangle=-45,
-            title_font=dict(size=14),
-            tickfont=dict(size=14),
-            autorange=True,
-        ),
-        yaxis=dict(
-            title="Опаковки",
-            title_font=dict(size=14),
-            tickfont=dict(size=14),
-            autorange=True,
-        ),
-        barmode='stack',
-        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.5,  # Още по-долу за mobile
-            xanchor="center",
-            x=0.5
-        ),
-        hovermode='closest',
-        dragmode=False,
-        clickmode="event+select",
-        uirevision="constant",
-        margin=dict(l=0, r=0, t=30, b=0),
-        font=dict(size=12),
-    )
-    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
+        st.caption("Няма данни за предишния период за ръст.")
