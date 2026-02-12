@@ -478,7 +478,7 @@ if is_admin:
                 if k in st.session_state:
                     c[f"show_section_{s}"] = st.session_state[k]
             save_config_to_json(c)
-            st.rerun()
+            # st.rerun() в callback е no-op – Streamlit и така прави rerun при промяна на виджета
 
         order = cfg.get("page_section_order", list(PAGE_SECTION_IDS))
         for i, sid in enumerate(order):
