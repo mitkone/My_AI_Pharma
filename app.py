@@ -62,36 +62,6 @@ from advanced_viz import (
 
 
 # ============================================================================
-# TRACKING – лог на посещения по секции
-# ============================================================================
-
-VISIT_LOG_PATH = config.DATA_DIR / "visits_log.csv"
-ANALYTICS_FILES = [
-    config.DATA_DIR / "activity_log.csv",
-    VISIT_LOG_PATH,
-    config.DATA_DIR / "section_visits.csv",  # старият файл, ако съществува
-]
-
-
-def track_visit(section_name: str) -> None:
-
-
-            
-        pass
-
-
-def reset_analytics() -> None:
-    """Изтрива файловете с аналитика (activity_log, visits_log и стария section_visits)."""
-    for path in ANALYTICS_FILES:
-        try:
-            if path.exists():
-                path.unlink()
-        except Exception:
-            # Ако не можем да изтрием, не спираме приложението
-            pass
-
-
-# ============================================================================
 # AI INSIGHTS SUMMARY – изпълнителен обзор
 # ============================================================================
 
