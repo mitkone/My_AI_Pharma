@@ -69,11 +69,15 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
     )
     search_term = (search_val or "").strip().lower()
     
+    # Показвай бутоните само при търсене И когато избраният медикамент още не съвпада с резултата
     if search_term:
         matched = [d for d in drugs if search_term in d.lower()][:20]
         if matched:
-            cols = ui.columns(2)
-            for i, drug in enumerate(matched):
+            # Скрий бутоните ако потребителят вече е избрал (единствено съвпадение = текущия избор)
+            already_selected = len(matched) == 1 and matched[0] == current_selected
+            if not already_selected:
+                cols = ui.columns(2)
+                for i, drug in enumerate(matched):
                     with cols[i % 2]:
                         if ui.button(drug, key=f"sb_drug_btn_{drug}", use_container_width=True):
                             st.session_state["sb_product"] = drug
@@ -858,17 +862,19 @@ def create_brick_charts(
         Име на колоната с периоди
     """
     has_district = "District" in df.columns
-    
+    sel_region_brick = ""
+
     if not has_district:
         st.info('Избери лист "Total Bricks" за разбивка по региони и Brick-ове.')
         return
     
     st.subheader("Продажби по региони и Brick-ове")
     
-    # Селектор за период
+    # Селектор за период – по подразбиране последно тримесечие (Q4 или последното)
     geo_period = st.selectbox(
         "Период (за опаковките)",
         ["Всички периоди (сума)", "Последно тримесечие"] + periods,
+        index=1,
         key="geo_period",
     )
     
@@ -963,6 +969,44 @@ def create_brick_charts(
         font=dict(size=12),
     )
     st.plotly_chart(fig_geo, use_container_width=True, config=config.PLOTLY_CONFIG)
+
+    # Графика за ръст % – брикове (при регион/избран регион) или региони (при Всички + Региони)
+    st.markdown("#### 📈 Ръст % спрямо последно тримесечие")
+    try:
+        from logic import compute_last_vs_previous_rankings
+        from data_processing import get_sorted_periods
+        periods_sorted = get_sorted_periods(df, period_col)
+        if len(periods_sorted) >= 2:
+            grp_col = group_col
+            eff_region = selected_region if (selected_region and selected_region != "Всички") else sel_region_brick
+            df_grp = df[df["Region"] == eff_region] if grp_col == "District" and eff_region else df
+            res = compute_last_vs_previous_rankings(
+                df_grp, sel_product, period_col, tuple(periods_sorted), group_col=grp_col
+            )
+            if res and not res["merged"].empty:
+                m = res["merged"].sort_values("Growth_%", ascending=True)
+                lbl = "Брик" if grp_col == "District" else "Регион"
+                fig_g = px.bar(
+                    m, x="Growth_%", y="Region", orientation="h",
+                    color="Growth_%", color_continuous_scale=["#e74c3c", "#95a5a6", "#2ecc71"],
+                    range_color=[min(m["Growth_%"].min(), -1), max(m["Growth_%"].max(), 1)],
+                    text=[f"{x:+.1f}%" for x in m["Growth_%"]],
+                    title=f"Ръст % по {lbl} – {sel_product} ({res['last_period']} vs {res['prev_period']})",
+                )
+                fig_g.update_traces(textposition="outside")
+                fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
+                fig_g.update_layout(
+                    height=max(350, len(m) * 24), showlegend=False,
+                    xaxis_title="Ръст (%)", yaxis_title=lbl, coloraxis_showscale=False,
+                    margin=dict(l=80, r=80), dragmode=False,
+                )
+                st.plotly_chart(fig_g, use_container_width=True, config=config.PLOTLY_CONFIG)
+            else:
+                st.caption("Няма данни за ръст.")
+        else:
+            st.caption("Нужни са поне 2 периода за ръст.")
+    except Exception:
+        st.caption("Няма данни за ръст.")
 
 
 def render_last_vs_previous_quarter(

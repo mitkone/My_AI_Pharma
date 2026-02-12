@@ -36,34 +36,42 @@ def compute_last_vs_previous_rankings(
     product: str,
     period_col: str,
     periods: Tuple[str, ...],
+    group_col: str = "Region",
 ) -> Optional[Dict[str, Any]]:
     """
-    Изчислява лидерборд за % ръст по регион за един продукт: последен vs предпоследен период.
-    Връща merged DataFrame (Rank, Region, Last_Units, Previous_Units, Growth_%), last_period, prev_period, top_region, top_growth.
+    Изчислява лидерборд за % ръст по region/district за един продукт.
+    group_col: "Region" за региони, "District" за брикове.
+    Връща merged DataFrame (Rank, <group_col>, Last_Units, Previous_Units, Growth_%), last_period, prev_period, top_region, top_growth.
     """
-    if df.empty or "Region" not in df.columns or "Units" not in df.columns or period_col not in df.columns:
+    if df.empty or period_col not in df.columns or "Units" not in df.columns:
         return None
-    if "Drug_Name" not in df.columns or not product:
+    if group_col not in df.columns or "Drug_Name" not in df.columns or not product:
         return None
     if len(periods) < 2:
         return None
 
-    sub = df.loc[df["Drug_Name"] == product, [period_col, "Region", "Units"]]
+    sub = df.loc[df["Drug_Name"] == product, [period_col, group_col, "Units"]]
     if sub.empty:
         return None
 
-    last_period, prev_period = periods[-1], periods[-2]
-    last_df = sub.loc[sub[period_col] == last_period].groupby("Region", as_index=False)["Units"].sum()
+    from data_processing import get_period_sort_key
+    product_periods = sorted(sub[period_col].unique(), key=get_period_sort_key)
+    if len(product_periods) < 2:
+        return None
+    last_period, prev_period = product_periods[-1], product_periods[-2]
+
+    last_df = sub.loc[sub[period_col] == last_period].groupby(group_col, as_index=False)["Units"].sum()
     last_df = last_df.rename(columns={"Units": "Last_Units"})
-    prev_df = sub.loc[sub[period_col] == prev_period].groupby("Region", as_index=False)["Units"].sum()
+    prev_df = sub.loc[sub[period_col] == prev_period].groupby(group_col, as_index=False)["Units"].sum()
     prev_df = prev_df.rename(columns={"Units": "Previous_Units"})
 
-    merged = last_df.merge(prev_df, on="Region", how="outer").fillna(0)
+    merged = last_df.merge(prev_df, on=group_col, how="outer").fillna(0)
     prev_u = merged["Previous_Units"].values
     curr_u = merged["Last_Units"].values
     merged["Growth_%"] = np.where(prev_u == 0, np.where(curr_u > 0, 100.0, 0.0), ((curr_u - prev_u) / prev_u) * 100)
     merged = merged.sort_values("Growth_%", ascending=False).reset_index(drop=True)
     merged["Rank"] = range(1, len(merged) + 1)
+    merged = merged.rename(columns={group_col: "Region"})
 
     top_region = merged.iloc[0]["Region"] if len(merged) > 0 else None
     top_growth = float(merged.iloc[0]["Growth_%"]) if len(merged) > 0 else None

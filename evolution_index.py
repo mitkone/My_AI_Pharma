@@ -81,9 +81,14 @@ def render_evolution_index_tab(
     if has_district and sel_region and sel_region != "Всички":
         opts.append("brick")
         labels.append(f"По брикове в {sel_region}")
+    # По подразбиране от филтрите: Всички -> national; избран регион -> sidebar или brick
+    default_idx = 0
+    if sel_region and sel_region != "Всички":
+        default_idx = 2 if ("brick" in opts) else 1
     location_mode = st.radio(
         "Регион/Брик",
         options=opts,
+        index=default_idx,
         format_func=lambda x: labels[opts.index(x)] if x in opts else x,
         horizontal=True,
         key="ei_location",

@@ -51,7 +51,7 @@ from ui_components import (
     render_last_vs_previous_quarter,
 )
 from ai_analysis import render_ai_analysis_tab
-from comparison_tools import create_period_comparison, create_regional_comparison
+from comparison_tools import create_regional_comparison
 from evolution_index import render_evolution_index_tab
 from logic import compute_last_vs_previous_rankings, compute_ei_rows_and_overall
 from advanced_viz import (
@@ -148,20 +148,22 @@ def display_ai_insights(
             st.info("Няма достатъчно данни за AI Insights за текущите филтри.")
         return
 
-    # Growth % по региони за последните 2 периода
+    # Growth % – при "Всички" по региони, при избран регион по брикове
     best_region = best_growth = worst_region = worst_growth = None
+    sel_region = filters.get("region", "Всички")
+    use_bricks = sel_region and sel_region != "Всички" and "District" in df_raw.columns
+    group_col = "District" if use_bricks else "Region"
+    df_for_growth = df_raw[df_raw["Region"] == sel_region] if use_bricks else df_raw
     try:
         last_prev = compute_last_vs_previous_rankings(
-            df_raw, product, "Quarter", tuple(periods)
+            df_for_growth, product, "Quarter", tuple(periods), group_col=group_col
         )
         if last_prev is not None:
             merged = last_prev["merged"]
             if not merged.empty:
-                # Най-добър (по-висок Growth_%)
                 best_row = merged.sort_values("Growth_%", ascending=False).iloc[0]
                 best_region = best_row["Region"]
                 best_growth = float(best_row["Growth_%"])
-                # Най-слаб
                 worst_row = merged.sort_values("Growth_%", ascending=True).iloc[0]
                 worst_region = worst_row["Region"]
                 worst_growth = float(worst_row["Growth_%"])
@@ -207,12 +209,14 @@ def display_ai_insights(
             unsafe_allow_html=True,
         )
 
-        # Съдържание – използваме обикновен markdown за по-лесно форматиране
+        # Съдържание – при регион: брикове; при Всички: региони
         lines = []
+        label_best = "Най-добър брик" if use_bricks else "Най-добър регион"
+        label_worst = "Най-слаб брик" if use_bricks else "Най-слаб регион"
         if best_region is not None:
-            lines.append(f"- **Най-добър регион (ръст Units):** {best_region} ({best_growth:+.1f}%)")
+            lines.append(f"- **{label_best} (ръст Units):** {best_region} ({best_growth:+.1f}%)")
         if worst_region is not None:
-            lines.append(f"- **Най-слаб регион (ръст Units):** {worst_region} ({worst_growth:+.1f}%)")
+            lines.append(f"- **{label_worst} (ръст Units):** {worst_region} ({worst_growth:+.1f}%)")
         if avg_ei is not None:
             lines.append(f"- **Среден Еволюционен Индекс (EI):** {avg_ei:.1f}")
 
@@ -849,10 +853,8 @@ for sid in section_order:
             selected_region=filters.get("region"),
         )
     elif sid == "comparison":
-        st.markdown('<p class="section-header">⚖️ Сравнение по периоди и региони</p>', unsafe_allow_html=True)
+        st.markdown('<p class="section-header">⚖️ Сравнение на региони</p>', unsafe_allow_html=True)
         track_visit("Сравнение", team=selected_team_label, product=filters.get("product"))
-        create_period_comparison(df=df_filtered, products_list=products_on_chart, periods=periods, level_label=comp_level)
-        st.divider()
         if periods:
             create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1], level_label=comp_level, periods_fallback=periods)
     elif sid == "last_vs_prev":

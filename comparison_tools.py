@@ -3,6 +3,7 @@
 """
 
 import streamlit as st
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from typing import List, Tuple
@@ -218,65 +219,105 @@ def create_regional_comparison(
     periods_fallback: List[str] = None,
 ) -> None:
     """
-    Създава сравнение между региони за избран период.
-    
-    Параметри
-    ---------
-    df : pd.DataFrame
-        Данни за сравнение
-    products_list : List[str]
-        Продукти за показване
-    period : str
-        Период за сравнение
-    period_col : str
-        Колона с периоди
+    Създава сравнение между региони – по опаковки или по ръст % (лесно превключване).
     """
     st.subheader(f"🗺️ Сравнение на региони - {period}")
     if level_label:
         st.caption(f"📍 **Ниво:** {level_label}")
-    
-    # Филтриране по период – fallback ако няма данни за последния
+
+    view_mode = st.radio(
+        "Покажи по",
+        ["Опаковки", "Ръст % (спрямо предишно трим.)"],
+        horizontal=True,
+        key="regional_comp_view",
+    )
+
+    # Филтриране по период – fallback
     df_period = df[df[period_col] == period]
-    if df_period.empty and periods_fallback:
+    df_prod = df_period[df_period["Drug_Name"].isin(products_list)] if not df_period.empty else pd.DataFrame()
+    if (df_period.empty or df_prod.empty) and periods_fallback:
         for p in reversed(periods_fallback[:-1]):
+            if p == period:
+                continue
             df_period = df[df[period_col] == p]
-            if not df_period.empty:
+            df_prod = df_period[df_period["Drug_Name"].isin(products_list)] if not df_period.empty else pd.DataFrame()
+            if not df_prod.empty:
                 period = p
-                st.caption(f"*(Данни за {period} – последният период нямаше данни)*")
+                st.caption(f"*(Данни за {period})*")
                 break
-    df_prod = df_period[df_period["Drug_Name"].isin(products_list)]
-    
-    # Агрегиране по регион и продукт
-    agg = df_prod.groupby(["Region", "Drug_Name"])["Units"].sum().reset_index()
-    
+
+    agg = df_prod.groupby(["Region", "Drug_Name"])["Units"].sum().reset_index() if not df_prod.empty else pd.DataFrame()
+
     if agg.empty:
         st.info("Няма данни за сравнение.")
         return
-    
-    # Pivot за по-лесно сравнение
+
     pivot = agg.pivot(index="Region", columns="Drug_Name", values="Units").fillna(0)
-    
-    # Сортиране по общ обем
     pivot["Total"] = pivot.sum(axis=1)
     pivot = pivot.sort_values("Total", ascending=False).drop(columns=["Total"])
-    
-    # Stacked bar chart
-    fig = go.Figure()
-    
-    for product in products_list:
-        if product in pivot.columns:
-            fig.add_trace(go.Bar(
-                name=product,
-                x=pivot.index,
-                y=pivot[product],
-                text=pivot[product].apply(lambda x: f"{int(x):,}" if x > 0 else ""),
-                textposition='inside',
-            ))
-    
-    fig.update_layout(
-        title=f"Регионално разпределение - {period}",
-        legend_title="",
-        xaxis=dict(
+
+    if view_mode == "Ръст % (спрямо предишно трим.)":
+        # Изчисляваме ръст % за всеки продукт по регион
+        prev_period = None
+        if periods_fallback and period in periods_fallback:
+            idx = periods_fallback.index(period)
+            if idx > 0:
+                prev_period = periods_fallback[idx - 1]
+        if prev_period is None:
+            st.info("Няма предишен период за ръст.")
+            return
+        df_prev = df[df[period_col] == prev_period]
+        if df_prev.empty:
+            st.info("Няма данни за предишния период.")
+            return
+        agg_prev = df_prev[df_prev["Drug_Name"].isin(products_list)].groupby(["Region", "Drug_Name"])["Units"].sum().reset_index()
+        pivot_prev = agg_prev.pivot(index="Region", columns="Drug_Name", values="Units").fillna(0)
+        for col in pivot.columns:
+            if col in pivot_prev.columns:
+                prev_vals = pivot_prev[col].reindex(pivot.index).fillna(0)
+                curr_vals = pivot[col]
+                growth = np.where(prev_vals > 0, ((curr_vals - prev_vals) / prev_vals * 100), np.where(curr_vals > 0, 100.0, 0.0))
+                pivot[col] = growth
+            else:
+                pivot[col] = 0
+        pivot["Total"] = pivot[[c for c in pivot.columns if c in products_list]].sum(axis=1)
+        pivot = pivot.sort_values("Total", ascending=False).drop(columns=["Total"], errors="ignore")
+        fig = go.Figure()
+        for product in products_list:
+            if product in pivot.columns:
+                fig.add_trace(go.Bar(
+                    name=product,
+                    x=pivot.index,
+                    y=pivot[product],
+                    text=pivot[product].apply(lambda x: f"{x:+.1f}%" if pd.notna(x) else ""),
+                    textposition='outside',
+                ))
+        fig.add_hline(y=0, line_dash="dash", line_color="gray")
+        fig.update_layout(
+            title=f"Ръст % по регион – {period} vs {prev_period}",
+            yaxis_title="Ръст (%)",
+            barmode='group',
+            height=config.MOBILE_CHART_HEIGHT,
+            legend_title="",
+            xaxis=dict(title="Регион", tickangle=-45, title_font=dict(size=14), tickfont=dict(size=14)),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5),
+            margin=dict(l=0, r=0, t=30, b=0), font=dict(size=12),
+        )
+    else:
+        fig = go.Figure()
+        for product in products_list:
+            if product in pivot.columns:
+                fig.add_trace(go.Bar(
+                    name=product,
+                    x=pivot.index,
+                    y=pivot[product],
+                    text=pivot[product].apply(lambda x: f"{int(x):,}" if x > 0 else ""),
+                    textposition='inside',
+                ))
+        fig.update_layout(
+            title=f"Регионално разпределение - {period}",
+            legend_title="",
+            xaxis=dict(
             title="Регион",
             tickangle=-45,
             title_font=dict(size=14),
@@ -305,5 +346,4 @@ def create_regional_comparison(
         margin=dict(l=0, r=0, t=30, b=0),
         font=dict(size=12),
     )
-    
     st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
