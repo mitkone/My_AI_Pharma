@@ -41,3 +41,8 @@ desktop.ini
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Analytics (локални, не commit-ваме)
+visits_log.csv
+activity_log.csv
+section_visits.csv
