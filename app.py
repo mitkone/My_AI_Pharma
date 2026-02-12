@@ -83,6 +83,8 @@ def track_visit(
     """
     Логва посещение – само ако потребителят НЕ е admin.
     Тротълване: max 1 запис на минута за същата (section, team, product, region).
+    ВАЖНО: Викаме track_visit само веднъж на зареждане на страницата (section="Page"),
+    за да не преувеличаваме броя – 1 гледане = 1 запис.
     """
     if skip_if_admin and st.session_state.get("is_admin", False):
         return
@@ -290,7 +292,11 @@ with col_logo:
     st.title("📱 Pharma Analytics 2026")
 
 # Един път зареждане; df_raw се подава по референция към всички табове
-df_raw = load_data()
+try:
+    df_raw = load_data()
+except Exception:
+    st.error("Грешка при зареждане на данните. Провери дали Excel файловете са в Team 1/, Team 2/, Team 3/.")
+    st.stop()
 
 # Проверка дали има данни
 if df_raw.empty:
@@ -349,18 +355,17 @@ if not selected_team_label:
                         except Exception as e:
                             st.error(f"Грешка: {e}")
             st.markdown("**Статистика**")
-            uv, tv = 0, 0
+            tv = 0
             if VISIT_LOG_PATH.exists():
                 try:
                     df_v = pd.read_csv(VISIT_LOG_PATH)
-                    if not df_v.empty and "section" in df_v.columns:
-                        uv, tv = df_v["section"].nunique(), len(df_v)
+                    if not df_v.empty:
+                        tv = len(df_v)
                 except Exception:
                     pass
-            sc1, sc2, sc3 = st.columns(3)
-            with sc1: st.metric("Уникални гледания", uv)
-            with sc2: st.metric("Общо гледания", tv)
-            with sc3:
+            sc1, sc2 = st.columns(2)
+            with sc1: st.metric("Общо гледания (1 запис = 1 зареждане)", tv)
+            with sc2:
                 if st.button("🔄 Нулирай брояча", key="reset_landing"):
                     reset_analytics()
                     st.success("Нулирано.")
@@ -807,6 +812,9 @@ st.markdown("---")
 section_order = cfg.get("page_section_order", list(PAGE_SECTION_IDS))
 comp_level = "Национално ниво" if filters["region"] == "Всички" else f"Регионално: {filters['region']}"
 
+# Един запис на страница – не по секции (иначе 1 гледане = 5+ записа)
+track_visit("Page", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
+
 # Голям видим блок: в кой регион сме (Всички или избран)
 sel_region = filters.get("region", "Всички")
 if sel_region and sel_region != "Всички":
@@ -840,7 +848,6 @@ for sid in section_order:
         continue
     if sid == "dashboard":
         st.markdown('<p class="section-header">📈 Dashboard</p>', unsafe_allow_html=True)
-        track_visit("Dashboard", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         df_agg, y_col, y_label = calculate_metric_data(
             df=df_filtered, products_list=products_on_chart, periods=periods,
             metric=metric, df_full=df_raw,
@@ -860,7 +867,6 @@ for sid in section_order:
                     show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
     elif sid == "brick":
         st.markdown('<p class="section-header">🗺️ Разбивка по Brick (райони)</p>', unsafe_allow_html=True)
-        track_visit("Brick", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         create_brick_charts(
             df=df_raw, products_list=products_on_chart, sel_product=filters["product"],
             competitors=filters["competitors"], periods=periods,
@@ -868,16 +874,13 @@ for sid in section_order:
         )
     elif sid == "comparison":
         st.markdown('<p class="section-header">⚖️ Сравнение на региони</p>', unsafe_allow_html=True)
-        track_visit("Сравнение", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         if periods:
             create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1], level_label=comp_level, periods_fallback=periods)
     elif sid == "last_vs_prev":
         st.markdown('<p class="section-header">📅 Последно vs Предишно тримесечие</p>', unsafe_allow_html=True)
-        track_visit("Посл. vs Предиш.", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
     elif sid == "evolution_index":
         st.markdown('<p class="section-header">📊 Еволюционен Индекс</p>', unsafe_allow_html=True)
-        track_visit("Evolution Index", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
         render_evolution_index_tab(
             df_filtered=df_filtered, df_national=df_raw, periods=periods,
             filters=filters, period_col="Quarter",

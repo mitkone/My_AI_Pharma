@@ -237,8 +237,14 @@ def prepare_data_for_display(df: pd.DataFrame) -> pd.DataFrame:
     if "Region" in df.columns:
         df["Region"] = df["Region"].astype(str).str.replace(r"^Region\s+", "", regex=True).str.strip()
     
-    # Добавяне на молекули
-    df = add_molecule_column(df)
+    # Добавяне на молекули (защита срещу липсваща колона)
+    try:
+        if "Drug_Name" in df.columns:
+            df = add_molecule_column(df)
+        else:
+            df["Molecule"] = "Other"
+    except Exception:
+        df["Molecule"] = "Other"
     
     # Конвертиране на Units в числа
     df["Units"] = pd.to_numeric(df["Units"], errors="coerce")
