@@ -72,19 +72,16 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
     if search_term:
         matched = [d for d in drugs if search_term in d.lower()][:20]
         if matched:
-            ui.caption("Избери с клик:")
             cols = ui.columns(2)
             for i, drug in enumerate(matched):
-                with cols[i % 2]:
-                    if ui.button(drug, key=f"sb_drug_btn_{drug}", use_container_width=True):
-                        st.session_state["sb_product"] = drug
-                        if "quick_search_drug" in st.session_state:
-                            del st.session_state["quick_search_drug"]
-                        st.rerun()
+                    with cols[i % 2]:
+                        if ui.button(drug, key=f"sb_drug_btn_{drug}", use_container_width=True):
+                            st.session_state["sb_product"] = drug
+                            if "quick_search_drug" in st.session_state:
+                                del st.session_state["quick_search_drug"]
+                            st.rerun()
         else:
             ui.caption("Няма съвпадения – опитай друго име")
-    else:
-        ui.caption("Пиши поне 1 символ за предложения")
     
     sel_product = st.session_state["sb_product"]
     

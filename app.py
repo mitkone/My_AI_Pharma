@@ -633,9 +633,15 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                 prev_period = periods[-2]
                 last_units = selected_product_data[selected_product_data["Quarter"] == last_period]["Units"].sum()
                 prev_units = selected_product_data[selected_product_data["Quarter"] == prev_period]["Units"].sum()
-                growth_pct = ((last_units - prev_units) / prev_units * 100) if prev_units > 0 else 0
+                if prev_units > 0:
+                    growth_pct = ((last_units - prev_units) / prev_units) * 100
+                elif last_units > 0:
+                    growth_pct = 100.0
+                else:
+                    growth_pct = 0.0
                 market_share_pct = 0
-                if "Source" in df_raw.columns:
+                df_ms = df_filtered if filters["region"] != "Всички" else df_raw
+                if "Source" in df_ms.columns:
                     product_source = selected_product_data["Source"].iloc[0] if len(selected_product_data) > 0 else None
                     if product_source:
                         def is_atc_class(drug_name):
@@ -652,7 +658,7 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                                 drug_name not in ["GRAND TOTAL", "Grand Total"] and
                                 not drug_name.startswith("Region")
                             )
-                        df_classes = df_raw[df_raw["Drug_Name"].apply(is_atc_class)].copy()
+                        df_classes = df_ms[df_ms["Drug_Name"].apply(is_atc_class)].copy()
                         if len(df_classes) > 0:
                             matching_classes = df_classes[df_classes["Source"] == product_source]["Drug_Name"].unique()
                             if len(matching_classes) > 0:
@@ -660,21 +666,23 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                                 class_last = df_classes[
                                     (df_classes["Drug_Name"] == class_name) & (df_classes["Quarter"] == last_period)
                                 ]["Units"].sum()
-                                national_product_last = df_raw[
-                                    (df_raw["Drug_Name"] == filters["product"]) & (df_raw["Quarter"] == last_period)
+                                product_last = df_ms[
+                                    (df_ms["Drug_Name"] == filters["product"]) & (df_ms["Quarter"] == last_period)
                                 ]["Units"].sum()
-                                market_share_pct = (national_product_last / class_last * 100) if class_last > 0 else 0
+                                market_share_pct = (product_last / class_last * 100) if class_last > 0 else 0
                 regions_count = selected_product_data[selected_product_data["Quarter"] == last_period]["Region"].nunique()
                 growth_units = int(last_units - prev_units)
                 region_label = filters["region"] if filters["region"] != "Всички" else "Всички региони"
                 brick_label = filters["district"] if filters.get("district") and filters["district"] != "Всички" else "Всички Брикове"
+                ms_label = "MS (регион)" if filters["region"] != "Всички" else "MS (нац.)"
                 st.markdown('<p class="section-header">📊 Ключови показатели</p>', unsafe_allow_html=True)
                 st.caption(f"📍 **{region_label}** | **Брик:** {brick_label}")
                 k1, k2, k3, k4 = st.columns(4)
                 with k1: st.metric("Продажби", f"{int(last_units):,}", f"{growth_pct:+.1f}%")
-                with k2: st.metric("MS", f"{market_share_pct:.2f}%", None)
+                with k2: st.metric(ms_label, f"{market_share_pct:.2f}%", None)
                 with k3: st.metric("Региони", str(regions_count), None)
-                with k4: st.metric("Промяна", f"{abs(growth_units):,}", f"{'↑' if growth_units > 0 else '↓'} {abs(growth_pct):.1f}%")
+                with k4:
+                    st.metric("Промяна", f"{abs(growth_units):,}", f"{growth_pct:+.1f}%", delta_color="normal")
 
         elif comp_id == "ai_insights":
             display_ai_insights(df_raw, df_filtered, filters, periods)
@@ -758,6 +766,29 @@ st.markdown("---")
 section_order = cfg.get("page_section_order", list(PAGE_SECTION_IDS))
 comp_level = "Национално ниво" if filters["region"] == "Всички" else f"Регионално: {filters['region']}"
 
+# При избран регион: показваме инфо блок и преместваме Brick нагоре
+sel_region = filters.get("region", "Всички")
+if sel_region and sel_region != "Всички":
+    df_reg = df_raw[df_raw["Region"] == sel_region]
+    if not df_reg.empty:
+        bricks = df_reg["District"].dropna().unique() if "District" in df_reg.columns else []
+        n_bricks = len(bricks)
+        top3 = []
+        if periods and "District" in df_reg.columns:
+            last_p = periods[-1]
+            top_df = df_reg[df_reg["Quarter"] == last_p].groupby("District")["Units"].sum().sort_values(ascending=False).head(3)
+            top3 = list(top_df.index)
+        parts = [f"📍 **Регион:** {sel_region}", f"**{n_bricks}** брикове"]
+        if top3:
+            parts.append(f"Топ 3: {', '.join(top3)}")
+        st.info(" | ".join(parts))
+    # Brick секцията отива преди Dashboard при регионален фокус
+    if "brick" in section_order and "dashboard" in section_order:
+        bi, di = section_order.index("brick"), section_order.index("dashboard")
+        if bi > di:
+            section_order = [s for s in section_order if s != "brick"]
+            section_order.insert(di, "brick")
+
 for sid in section_order:
     if not cfg.get(f"show_section_{sid}", True):
         continue
@@ -793,7 +824,7 @@ for sid in section_order:
         create_period_comparison(df=df_filtered, products_list=products_on_chart, periods=periods, level_label=comp_level)
         st.divider()
         if periods:
-            create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1], level_label=comp_level)
+            create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1], level_label=comp_level, periods_fallback=periods)
     elif sid == "last_vs_prev":
         st.markdown('<p class="section-header">📅 Последно vs Предишно тримесечие</p>', unsafe_allow_html=True)
         render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")

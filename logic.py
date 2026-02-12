@@ -178,3 +178,37 @@ def compute_region_ei_benchmark(
             out.append((region, ei_w / w_sum))
     out.sort(key=lambda x: x[1], reverse=True)
     return out
+
+
+@st.cache_data(show_spinner=False)
+def compute_brick_ei_benchmark(
+    df: pd.DataFrame,
+    drugs: Tuple[str, ...],
+    ref_period: str,
+    base_period: str,
+    period_col: str,
+    region_filter: str = None,
+) -> List[Tuple[str, float]]:
+    """Връща списък (district/brick, weighted_avg_ei) за всеки брик в региона."""
+    if df.empty or "District" not in df.columns or not drugs:
+        return []
+    f = df.copy()
+    if region_filter and region_filter != "Всички":
+        f = f[f["Region"] == region_filter]
+    if f.empty:
+        return []
+    districts = sorted(f["District"].dropna().unique())
+    out: List[Tuple[str, float]] = []
+    for dist in districts:
+        df_d = f[f["District"] == dist]
+        rows, _ = compute_ei_rows_and_overall(df_d, drugs, ref_period, base_period, period_col)
+        w_sum = 0.0
+        ei_w = 0.0
+        for r in rows:
+            if r["ei"] is not None and r["sales_ref"] and r["sales_ref"] > 0:
+                ei_w += r["ei"] * r["sales_ref"]
+                w_sum += r["sales_ref"]
+        if w_sum > 0:
+            out.append((str(dist), ei_w / w_sum))
+    out.sort(key=lambda x: x[1], reverse=True)
+    return out

@@ -215,6 +215,7 @@ def create_regional_comparison(
     period: str,
     period_col: str = "Quarter",
     level_label: str = None,
+    periods_fallback: List[str] = None,
 ) -> None:
     """
     Създава сравнение между региони за избран период.
@@ -234,10 +235,15 @@ def create_regional_comparison(
     if level_label:
         st.caption(f"📍 **Ниво:** {level_label}")
     
-    # Филтриране по период
+    # Филтриране по период – fallback ако няма данни за последния
     df_period = df[df[period_col] == period]
-    
-    # Филтриране на продукти
+    if df_period.empty and periods_fallback:
+        for p in reversed(periods_fallback[:-1]):
+            df_period = df[df[period_col] == p]
+            if not df_period.empty:
+                period = p
+                st.caption(f"*(Данни за {period} – последният период нямаше данни)*")
+                break
     df_prod = df_period[df_period["Drug_Name"].isin(products_list)]
     
     # Агрегиране по регион и продукт

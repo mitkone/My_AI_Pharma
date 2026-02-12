@@ -73,11 +73,18 @@ def render_evolution_index_tab(
     """
     st.subheader("📊 Еволюционен Индекс")
     
-    # Location selector: National или Region/Brick от sidebar
+    has_district = "District" in df_filtered.columns and not df_filtered["District"].isna().all()
+    sel_region = filters.get("region", "Всички")
+    
+    opts = ["national", "sidebar"]
+    labels = ["Всички региони (национално)", "Регион/Брик от филтрите"]
+    if has_district and sel_region and sel_region != "Всички":
+        opts.append("brick")
+        labels.append(f"По брикове в {sel_region}")
     location_mode = st.radio(
         "Регион/Брик",
-        options=["national", "sidebar"],
-        format_func=lambda x: "Всички региони (национално)" if x == "national" else "Регион/Брик от sidebar",
+        options=opts,
+        format_func=lambda x: labels[opts.index(x)] if x in opts else x,
         horizontal=True,
         key="ei_location",
     )
@@ -125,7 +132,7 @@ def render_evolution_index_tab(
         st.info("Избери поне един медикамент.")
         return
 
-    from logic import compute_ei_rows_and_overall, compute_region_ei_benchmark
+    from logic import compute_ei_rows_and_overall, compute_region_ei_benchmark, compute_brick_ei_benchmark
 
     rows, overall_ei = compute_ei_rows_and_overall(
         df, tuple(sel_drugs), ref_period, base_period, period_col
@@ -145,18 +152,25 @@ def render_evolution_index_tab(
         f"Претеглено по продажби в {location_label} (референтен период)."
     )
     
-    # Regional Benchmark Chart – EI по регион
-    region_ei_data = compute_region_ei_benchmark(
-        df_national, tuple(sel_drugs), ref_period, base_period, period_col
-    )
-    labels = [r[0] for r in region_ei_data]
-    values = [r[1] for r in region_ei_data]
+    # Regional / Brick Benchmark Chart
+    if location_mode == "brick" and has_district and sel_region and sel_region != "Всички":
+        region_ei_data = compute_brick_ei_benchmark(
+            df_filtered, tuple(sel_drugs), ref_period, base_period, period_col, region_filter=sel_region
+        )
+        chart_title = f"### 📊 EI по брикове в {sel_region}"
+    else:
+        region_ei_data = compute_region_ei_benchmark(
+            df_national, tuple(sel_drugs), ref_period, base_period, period_col
+        )
+        chart_title = "### 📊 EI по регион (бенчмарк)"
+    labels_ei = [r[0] for r in region_ei_data]
+    values_ei = [r[1] for r in region_ei_data]
 
     if region_ei_data:
         st.markdown("---")
-        st.markdown("### 📊 EI по регион (бенчмарк)")
-        
-        fig = _build_ei_region_figure(tuple(labels), tuple(values))
+        st.markdown(chart_title)
+        is_brick = location_mode == "brick"
+        fig = _build_ei_region_figure(tuple(labels_ei), tuple(values_ei), yaxis_title="Брик" if is_brick else "Регион")
         st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
         st.caption("Графиката показва сравнително представяне на избраното портфолио по региони за избраните периоди.")
 
@@ -189,8 +203,8 @@ def render_evolution_index_tab(
 
 
 @st.cache_resource(show_spinner=False)
-def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...]) -> go.Figure:
-    """Създава Plotly фигура за EI по регион (скъпа за рендер)."""
+def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], yaxis_title: str = "Регион") -> go.Figure:
+    """Създава Plotly фигура за EI по регион или брик."""
     colors = ["#2ecc71" if v >= 100 else "#e74c3c" for v in values]
     
     fig = go.Figure()
@@ -206,7 +220,7 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...]) 
     fig.add_vline(x=100, line_dash="dash", line_color="red", line_width=2)
     fig.update_layout(
         xaxis_title="Еволюционен Индекс (EI)",
-        yaxis_title="Регион",
+        yaxis_title=yaxis_title,
         height=800,
         margin=dict(l=80, r=60, t=20, b=40),
         showlegend=False,
