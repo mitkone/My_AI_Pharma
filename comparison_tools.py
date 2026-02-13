@@ -256,26 +256,29 @@ def create_regional_comparison(
         st.info("Няма данни за избраните региони.")
         return
 
-    # 1. Графика за опаковки
+    # 1. Графика за опаковки – хоризонтални барове (региони отгоре надолу, най-силен първо)
     fig = go.Figure()
     for product in products_list:
         if product in pivot.columns:
+            vals = pivot[product]
             fig.add_trace(go.Bar(
                 name=product,
-                x=pivot.index,
-                y=pivot[product],
-                text=pivot[product].apply(lambda x: f"{int(x):,}" if x > 0 else ""),
+                x=vals.values,
+                y=pivot.index,
+                orientation='h',
+                text=vals.apply(lambda x: f"{int(x):,}" if x > 0 else ""),
                 textposition='inside',
+                textfont=dict(size=10),
             ))
     fig.update_layout(
         title=f"Регионално разпределение - {period}",
         legend_title="",
-        xaxis=dict(title="", tickangle=-45, tickfont=dict(size=12), autorange=True),
-        yaxis=dict(title="", tickfont=dict(size=12), autorange=True),
+        xaxis=dict(title="", tickfont=dict(size=11)),
+        yaxis=dict(title="", tickfont=dict(size=11), categoryorder="array", categoryarray=pivot.index.tolist()[::-1]),  # най-силен отгоре
         barmode='stack',
-        height=config.MOBILE_CHART_HEIGHT,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5),
-        hovermode='closest', dragmode=False, margin=dict(l=0, r=0, t=30, b=0), font=dict(size=12),
+        height=max(config.MOBILE_CHART_HEIGHT, len(pivot) * 28),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+        hovermode='closest', dragmode=False, margin=dict(l=100, r=30, t=30, b=20), font=dict(size=12),
     )
     st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
 
@@ -305,27 +308,28 @@ def create_regional_comparison(
         for product in products_list:
             if product in pivot_growth.columns:
                 pct = pivot_growth[product]
-                delta_vals = (pivot[product] - pivot_prev_reidx[product]).reindex(pivot_growth.index).fillna(0) if product in pivot.columns else pd.Series(0.0, index=pivot_growth.index)
-                txt = [f"{p:+.1f}%" for p in pct]  # mobile: само %
+                txt = [f"{p:+.1f}%" for p in pct]
                 fig2.add_trace(go.Bar(
                     name=product,
-                    x=pivot_growth.index,
-                    y=pivot_growth[product],
+                    x=pct.values,
+                    y=pivot_growth.index,
+                    orientation='h',
                     text=txt,
                     textposition='outside',
+                    textfont=dict(size=10),
                 ))
-        fig2.add_hline(y=0, line_dash="dash", line_color="gray")
+        fig2.add_vline(x=0, line_dash="dash", line_color="gray")
         n_reg = len(pivot_growth)
         fig2.update_layout(
             title=f"Ръст % – {period} vs {prev_period}",
-            yaxis_title="",
+            xaxis_title="",
             barmode='group',
-            height=max(500, n_reg * 34),
+            height=max(500, n_reg * 32),
             legend_title="",
-            xaxis=dict(title="", tickangle=-45, tickfont=dict(size=11)),
-            yaxis=dict(tickfont=dict(size=11)),
-            legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5),
-            margin=dict(l=50, r=30, t=35, b=60),
+            xaxis=dict(tickfont=dict(size=11)),
+            yaxis=dict(title="", tickfont=dict(size=11), categoryorder="array", categoryarray=pivot_growth.index.tolist()),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="center", x=0.5),
+            margin=dict(l=100, r=60, t=35, b=30),
             font=dict(size=12),
         )
         st.plotly_chart(fig2, width="stretch", config=config.PLOTLY_CONFIG)

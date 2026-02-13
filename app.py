@@ -548,12 +548,6 @@ FILTER_KEYS = [
     "drug_suggest_radio",
 ]
 
-st.markdown(
-    '<div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-radius: 12px; '
-    'padding: 1rem 1.5rem; margin-bottom: 1rem; border: 2px solid #334155;"><p style="margin: 0; '
-    'font-size: 1.35rem; font-weight: 700;">🔧 Филтри</p></div>',
-    unsafe_allow_html=True,
-)
 col_reset, _ = st.columns([1, 4])
 with col_reset:
     if st.button("🔄 Изчисти филтри", type="secondary", key="reset_filters_btn"):
@@ -696,16 +690,21 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                 ai_part = ""
                 if best_region is not None and worst_region is not None:
                     ai_part = f'<span style="font-size: 0.9rem; opacity: 0.9;">Най-добър: {best_region} {best_growth:+.1f}% · Най-слаб: {worst_region} {worst_growth:+.1f}%</span>'
+                gc = "#22c55e" if growth_pct >= 0 else "#ef4444"  # зелено/червено за ръст
+                uc = "#22c55e" if growth_units >= 0 else "#ef4444"  # зелено/червено за опаковки
+                bricks_txt = f" · {bricks_count} брикове" + (" в региона" if region_label != "Всички региони" else "")
                 st.markdown(
-                    f'<div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 10px; '
-                    f'padding: 0.75rem 1rem; margin-bottom: 0.75rem; border: 1px solid #334155;">'
+                    f'<div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-radius: 12px; '
+                    f'padding: 1rem 1.25rem; margin-bottom: 1rem; border: 1px solid #334155;">'
+                    f'<p style="margin: 0 0 0.6rem 0; font-size: 1.15rem; font-weight: 600;">'
+                    f'📍 Регион: <span style="color: #60a5fa;">{region_label}</span>{bricks_txt}</p>'
                     f'<div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; font-size: 0.95rem;">'
-                    f'<span><b>Продажби:</b> {int(last_units):,} <span style="color: {"#22c55e" if growth_pct >= 0 else "#ef4444"};">{growth_pct:+.1f}%</span></span>'
+                    f'<span><b>Продажби:</b> {int(last_units):,} <span style="color: {gc};">{growth_pct:+.1f}%</span></span>'
                     f'<span><b>{ms_label}:</b> {market_share_pct:.2f}%</span>'
                     f'<span><b>Региони:</b> {regions_count}</span>'
                     f'<span><b>Брикове:</b> {bricks_count}</span>'
-                    f'<span><b>Промяна:</b> {growth_units:+,} оп.</span>'
-                    f'<span style="opacity: 0.8;">· {last_period} · {region_label}</span>'
+                    f'<span><b>Промяна:</b> <span style="color: {uc};">{growth_units:+,} оп.</span></span>'
+                    f'<span style="opacity: 0.8;">· {last_period}</span>'
                     f'</div>'
                     f'<div style="margin-top: 4px;">{ai_part}</div>'
                     f'</div>',
@@ -797,33 +796,13 @@ comp_level = "Национално ниво" if filters["region"] == "Всичк
 # Един запис на страница – не по секции (иначе 1 гледане = 5+ записа)
 track_visit("Page", team=selected_team_label, product=filters.get("product"), region=filters.get("region"), district=filters.get("district"))
 
-# Голям видим блок: в кой регион сме (Всички или избран)
+# Brick секцията отива преди Dashboard при регионален фокус
 sel_region = filters.get("region", "Всички")
-if sel_region and sel_region != "Всички":
-    df_reg = df_raw[df_raw["Region"] == sel_region]
-    if not df_reg.empty:
-        bricks = df_reg["District"].dropna().unique() if "District" in df_reg.columns else []
-        n_bricks = len(bricks)
-        st.markdown(
-            f'<div style="background: linear-gradient(90deg, #1e3a5f, #0f172a); border-radius: 12px; padding: 1.2rem 1.5rem; '
-            f'margin-bottom: 1rem; border: 1px solid #334155;"><p style="margin: 0; font-size: 1.3rem; font-weight: 600;">'
-            f'📍 Регион: <span style="color: #60a5fa;">{sel_region}</span></p>'
-            f'<p style="margin: 0.4rem 0 0 0; font-size: 1rem; opacity: 0.9;">{n_bricks} брикове в региона</p></div>',
-            unsafe_allow_html=True,
-        )
-    # Brick секцията отива преди Dashboard при регионален фокус
-    if "brick" in section_order and "dashboard" in section_order:
-        bi, di = section_order.index("brick"), section_order.index("dashboard")
-        if bi > di:
-            section_order = [s for s in section_order if s != "brick"]
-            section_order.insert(di, "brick")
-else:
-    st.markdown(
-        '<div style="background: linear-gradient(90deg, #1e3a5f, #0f172a); border-radius: 12px; padding: 1.2rem 1.5rem; '
-        'margin-bottom: 1rem; border: 1px solid #334155;"><p style="margin: 0; font-size: 1.3rem; font-weight: 600;">'
-        '📍 Регион: <span style="color: #60a5fa;">Всички (национален преглед)</span></p></div>',
-        unsafe_allow_html=True,
-    )
+if sel_region and sel_region != "Всички" and "brick" in section_order and "dashboard" in section_order:
+    bi, di = section_order.index("brick"), section_order.index("dashboard")
+    if bi > di:
+        section_order = [s for s in section_order if s != "brick"]
+        section_order.insert(di, "brick")
 
 for sid in section_order:
     if not cfg.get(f"show_section_{sid}", True):

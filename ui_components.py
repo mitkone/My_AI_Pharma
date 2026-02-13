@@ -951,48 +951,35 @@ def create_brick_charts(
     x_label = "Регион" if by_region else "Brick"
     comp_text = f" vs {', '.join(competitors[:2])}" + ("…" if len(competitors) > 2 else "") if competitors else ""
     
+    df_geo_agg = df_geo_agg.copy()
+    df_geo_agg["_lbl"] = df_geo_agg["Units"].apply(lambda u: f"{int(u):,}" if u > 0 else "")
     fig_geo = px.bar(
         df_geo_agg,
-        x=group_col,
-        y="Units",
+        y=group_col,
+        x="Units",
         color="Drug_Name",
         barmode="group",
+        orientation="h",
+        text="_lbl",
         title=f"Опаковки по {x_label} – {sel_product}{comp_text}",
     )
-    
-    # Почистен hover template - само име и стойност
     fig_geo.update_traces(
-        hovertemplate="<b>%{fullData.name}</b><br>%{x}<br>%{y:,.0f} опак.<extra></extra>"
+        hovertemplate="<b>%{fullData.name}</b><br>%{y}<br>%{x:,.0f} опак.<extra></extra>",
+        textposition="outside",
+        textfont=dict(size=10),
     )
     
     fig_geo.update_layout(
-        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
+        height=max(config.MOBILE_CHART_HEIGHT, len(df_geo_agg[group_col].unique()) * 28),
         legend_title="",
-        xaxis_tickangle=-45,
-        xaxis=dict(
-            title="",
-            title_font=dict(size=14),
-            tickfont=dict(size=14),
-            autorange=True,
-        ),
-        yaxis=dict(
-            title="",  # mobile: без надпис за повече място
-            title_font=dict(size=12),
-            tickfont=dict(size=12),
-            autorange=True,
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=-0.5,
-            xanchor="center",
-            x=0.5
-        ),
+        xaxis=dict(title="", tickfont=dict(size=11)),
+        yaxis=dict(title="", tickfont=dict(size=11), categoryorder="total descending"),  # най-силен отгоре
+        legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5),
         hovermode='closest',
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
-        margin=dict(l=4, r=4, t=30, b=0),  # минимум margins за mobile
+        margin=dict(l=100, r=30, t=30, b=20),
         font=dict(size=12),
     )
     st.plotly_chart(fig_geo, width="stretch", config=config.PLOTLY_CONFIG)
