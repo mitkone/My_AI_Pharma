@@ -6,7 +6,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import config
 
 
@@ -217,6 +217,7 @@ def create_regional_comparison(
     period_col: str = "Quarter",
     level_label: str = None,
     periods_fallback: List[str] = None,
+    allowed_region_names: Optional[List[str]] = None,
 ) -> None:
     """
     Създава сравнение между региони – по опаковки или по ръст % (лесно превключване).
@@ -248,6 +249,12 @@ def create_regional_comparison(
     pivot = agg.pivot(index="Region", columns="Drug_Name", values="Units").fillna(0)
     pivot["Total"] = pivot.sum(axis=1)
     pivot = pivot.sort_values("Total", ascending=False).drop(columns=["Total"])
+    if allowed_region_names:
+        allowed_r = set(str(r).strip() for r in allowed_region_names)
+        pivot = pivot[pivot.index.astype(str).str.strip().isin(allowed_r)]
+    if pivot.empty:
+        st.info("Няма данни за избраните региони.")
+        return
 
     # 1. Графика за опаковки
     fig = go.Figure()

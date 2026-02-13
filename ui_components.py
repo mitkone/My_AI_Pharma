@@ -32,8 +32,11 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
     ui = st.sidebar if use_sidebar else st
     ui.header("Филтри")
     
-    # Списъци САМО от данните на текущия екип – региони/продукти които ги няма в данните не се показват
-    regions = ["Всички"] + sorted(df["Region"].dropna().unique().tolist())
+    # Списъци САМО от реално присъстващи стойности (set() за да няма „фантомни” региони от category dtype)
+    region_values = df["Region"].dropna().astype(str).str.strip()
+    region_values = sorted(region_values[region_values != ""].unique().tolist())
+    regions = ["Всички"] + region_values
+    allowed_region_names = region_values  # за графики и AI – само тези региони
     drugs = sorted(df["Drug_Name"].dropna().unique().tolist())
     molecules = sorted(df["Molecule"].dropna().unique().tolist())
     has_district = "District" in df.columns
@@ -223,6 +226,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
         "competitors": processed_competitors,  # Вече включва и класовете
         "product_source": prod_sources[0] if prod_sources.size > 0 else None,
         "has_district": has_district,
+        "allowed_region_names": allowed_region_names,  # само региони от списъка – за графики и AI
     }
 
 
@@ -837,6 +841,7 @@ def create_brick_charts(
     periods: List[str],
     period_col: str = "Quarter",
     selected_region: str = None,
+    allowed_region_names: Optional[List[str]] = None,
 ) -> None:
     """
     Създава графики по региони и brick-ове.
@@ -920,6 +925,10 @@ def create_brick_charts(
     df_geo_chart = df_geo[df_geo["Drug_Name"].isin(allowed_set)].copy()
     df_geo_agg = df_geo_chart.groupby([group_col, "Drug_Name"], as_index=False)["Units"].sum()
     df_geo_agg = df_geo_agg[df_geo_agg["Drug_Name"].isin(allowed_set)]
+    # Само региони от списъка във филтрите (да не се появяват Pleven-Lovech и др. които ги няма в падащото меню)
+    if allowed_region_names is not None and group_col == "Region":
+        allowed_r_set = set(str(r).strip() for r in allowed_region_names)
+        df_geo_agg = df_geo_agg[df_geo_agg[group_col].astype(str).str.strip().isin(allowed_r_set)]
     df_geo_agg = df_geo_agg.sort_values("Units", ascending=False)
     
     if df_geo_agg.empty:
@@ -991,25 +1000,32 @@ def create_brick_charts(
             )
             if res and not res["merged"].empty:
                 m = res["merged"].sort_values("Growth_%", ascending=True)
-                m["Units_Delta"] = m["Last_Units"] - m["Previous_Units"]
-                lbl = "Брик" if grp_col == "District" else "Регион"
-                txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(m["Growth_%"], m["Units_Delta"])]
-                fig_g = px.bar(
-                    m, x="Growth_%", y="Region", orientation="h",
-                    color="Growth_%", color_continuous_scale=["#e74c3c", "#95a5a6", "#2ecc71"],
-                    range_color=[min(m["Growth_%"].min(), -1), max(m["Growth_%"].max(), 1)],
-                    text=txts,
-                    title=f"Ръст % по {lbl} – {sel_product} ({res['last_period']} vs {res['prev_period']})",
-                )
-                fig_g.update_traces(textposition="outside")
-                fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
-                fig_g.update_layout(
-                    height=max(450, len(m) * 36), showlegend=False,
-                    xaxis_title="Ръст (%)", yaxis_title=lbl, coloraxis_showscale=False,
-                    margin=dict(l=120, r=100), dragmode=False,
-                    yaxis=dict(tickfont=dict(size=14)), xaxis=dict(tickfont=dict(size=12)),
-                )
-                st.plotly_chart(fig_g, width="stretch", config=config.PLOTLY_CONFIG)
+                if allowed_region_names is not None and grp_col == "Region":
+                    allowed_r_set = set(str(r).strip() for r in allowed_region_names)
+                    m = m[m["Region"].astype(str).str.strip().isin(allowed_r_set)]
+                if m.empty:
+                    st.caption("Няма данни за ръст за избраните региони.")
+                else:
+                    m = m.copy()
+                    m["Units_Delta"] = m["Last_Units"] - m["Previous_Units"]
+                    lbl = "Брик" if grp_col == "District" else "Регион"
+                    txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(m["Growth_%"], m["Units_Delta"])]
+                    fig_g = px.bar(
+                        m, x="Growth_%", y="Region", orientation="h",
+                        color="Growth_%", color_continuous_scale=["#e74c3c", "#95a5a6", "#2ecc71"],
+                        range_color=[min(m["Growth_%"].min(), -1), max(m["Growth_%"].max(), 1)],
+                        text=txts,
+                        title=f"Ръст % по {lbl} – {sel_product} ({res['last_period']} vs {res['prev_period']})",
+                    )
+                    fig_g.update_traces(textposition="outside")
+                    fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
+                    fig_g.update_layout(
+                        height=max(450, len(m) * 36), showlegend=False,
+                        xaxis_title="Ръст (%)", yaxis_title=lbl, coloraxis_showscale=False,
+                        margin=dict(l=120, r=100), dragmode=False,
+                        yaxis=dict(tickfont=dict(size=14)), xaxis=dict(tickfont=dict(size=12)),
+                    )
+                    st.plotly_chart(fig_g, width="stretch", config=config.PLOTLY_CONFIG)
             else:
                 st.caption("Няма данни за ръст.")
         else:
@@ -1022,6 +1038,7 @@ def render_last_vs_previous_quarter(
     df: pd.DataFrame,
     selected_product: str,
     period_col: str = "Quarter",
+    allowed_region_names: Optional[List[str]] = None,
 ) -> None:
     """Рендира таб Последно vs Предишно: използва logic слой за изчисления, само UI тук."""
     from data_processing import get_sorted_periods
@@ -1042,6 +1059,12 @@ def render_last_vs_previous_quarter(
         return
 
     merged = result["merged"]
+    if allowed_region_names and not merged.empty and "Region" in merged.columns:
+        allowed_r_set = set(str(r).strip() for r in allowed_region_names)
+        merged = merged[merged["Region"].astype(str).str.strip().isin(allowed_r_set)]
+    if merged.empty:
+        st.warning("Няма данни за избраните региони.")
+        return
     last_period = result["last_period"]
     prev_period = result["prev_period"]
     top_region = result["top_region"]

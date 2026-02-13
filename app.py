@@ -138,6 +138,7 @@ def display_ai_insights(
     df_filtered: pd.DataFrame,
     filters: dict,
     periods: list,
+    allowed_region_names: list = None,
 ) -> None:
     """
     Показва кратък AI Insights Summary за текущия продукт:
@@ -163,6 +164,10 @@ def display_ai_insights(
         )
         if last_prev is not None:
             merged = last_prev["merged"]
+            # Само региони от списъка във филтрите (като в падащото меню)
+            if allowed_region_names and not merged.empty and "Region" in merged.columns:
+                allowed_set = set(str(r).strip() for r in allowed_region_names)
+                merged = merged[merged["Region"].astype(str).str.strip().isin(allowed_set)]
             if not merged.empty:
                 best_row = merged.sort_values("Growth_%", ascending=False).iloc[0]
                 best_region = best_row["Region"]
@@ -737,7 +742,7 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                 )
 
         elif comp_id == "ai_insights":
-            display_ai_insights(df_raw, df_filtered, filters, periods)
+            display_ai_insights(df_raw, df_filtered, filters, periods, allowed_region_names=filters.get("allowed_region_names"))
 
         elif comp_id == "target_tracker":
             st.markdown("### 🎯 Target Tracker")
@@ -877,14 +882,22 @@ for sid in section_order:
             df=df_raw, products_list=products_on_chart, sel_product=filters["product"],
             competitors=filters["competitors"], periods=periods,
             selected_region=filters.get("region"),
+            allowed_region_names=filters.get("allowed_region_names"),
         )
     elif sid == "comparison":
         st.markdown('<p class="section-header">⚖️ Сравнение на региони</p>', unsafe_allow_html=True)
         if periods:
-            create_regional_comparison(df=df_raw, products_list=products_on_chart, period=periods[-1], level_label=comp_level, periods_fallback=periods)
+            create_regional_comparison(
+                df=df_raw, products_list=products_on_chart, period=periods[-1],
+                level_label=comp_level, periods_fallback=periods,
+                allowed_region_names=filters.get("allowed_region_names"),
+            )
     elif sid == "last_vs_prev":
         st.markdown('<p class="section-header">📅 Последно vs Предишно тримесечие</p>', unsafe_allow_html=True)
-        render_last_vs_previous_quarter(df_raw, selected_product=filters["product"], period_col="Quarter")
+        render_last_vs_previous_quarter(
+            df_raw, selected_product=filters["product"], period_col="Quarter",
+            allowed_region_names=filters.get("allowed_region_names"),
+        )
     elif sid == "evolution_index":
         st.markdown('<p class="section-header">📊 Еволюционен Индекс</p>', unsafe_allow_html=True)
         render_evolution_index_tab(
