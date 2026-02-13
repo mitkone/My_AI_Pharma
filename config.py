@@ -3,6 +3,7 @@
 Тук съхраняваме всички настройки на едно място за лесна поддръжка.
 """
 
+import tempfile
 from pathlib import Path
 
 # === ДИРЕКТОРИИ ===
@@ -11,6 +12,24 @@ PROJECT_DIR = Path(__file__).parent
 
 # Папка с Excel файлове (същата, където е app.py)
 DATA_DIR = PROJECT_DIR
+
+
+def _is_writable(path: Path) -> bool:
+    """Проверява дали можем да пишем в директорията (Streamlit Cloud = read-only)."""
+    try:
+        test_file = path / ".write_test"
+        path.mkdir(parents=True, exist_ok=True)
+        test_file.write_text("")
+        test_file.unlink(missing_ok=True)
+        return True
+    except (OSError, PermissionError):
+        return False
+
+
+# Директория за файлове, които пишем (visits_log, config). На Streamlit Cloud PROJECT_DIR е read-only -> използваме temp
+_tmp_dir = Path(tempfile.gettempdir()) / "pharma_app"
+_tmp_dir.mkdir(parents=True, exist_ok=True)
+WRITABLE_DIR = PROJECT_DIR if _is_writable(PROJECT_DIR) else _tmp_dir
 
 # Папки по екипи – данните за всеки екип се пазят в отделна папка
 TEAM_FOLDERS = ["Team 1", "Team 2", "Team 3"]

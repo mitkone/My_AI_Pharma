@@ -1,0 +1,8 @@
+[server]
+# По-дълъг timeout за тежки зареждания (3M+ реда)
+headless = true
+enableCORS = false
+enableXsrfProtection = true
+
+[browser]
+gatherUsageStats = false

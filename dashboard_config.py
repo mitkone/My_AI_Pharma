@@ -11,8 +11,8 @@ import streamlit as st
 
 import config
 
-# JSON path for persisting dashboard config (optional)
-DASHBOARD_CONFIG_PATH = config.DATA_DIR / "dashboard_config.json"
+# JSON path for persisting dashboard config (optional). WRITABLE_DIR = /tmp на Streamlit Cloud
+DASHBOARD_CONFIG_PATH = config.WRITABLE_DIR / "dashboard_config.json"
 
 # Component IDs used in component_order and show_* keys
 COMPONENT_IDS = [

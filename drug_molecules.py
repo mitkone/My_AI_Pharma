@@ -10,7 +10,11 @@ import os
 import pandas as pd
 from pathlib import Path
 
-_CACHE_PATH = Path(__file__).parent / "drug_molecules_cache.json"
+try:
+    import config
+    _CACHE_PATH = config.WRITABLE_DIR / "drug_molecules_cache.json"
+except ImportError:
+    _CACHE_PATH = Path(__file__).parent / "drug_molecules_cache.json"
 _CSV_PATH = Path(__file__).parent / "DRUG_MOLECULES.csv"
 
 # Antihistamines (R06A)

@@ -65,11 +65,11 @@ from advanced_viz import (
 # TRACKING – лог на посещения по секции (без броене за admin)
 # ============================================================================
 
-VISIT_LOG_PATH = config.DATA_DIR / "visits_log.csv"
+VISIT_LOG_PATH = config.WRITABLE_DIR / "visits_log.csv"
 ANALYTICS_FILES = [
-    config.DATA_DIR / "activity_log.csv",
+    config.WRITABLE_DIR / "activity_log.csv",
     VISIT_LOG_PATH,
-    config.DATA_DIR / "section_visits.csv",
+    config.WRITABLE_DIR / "section_visits.csv",
 ]
 
 
