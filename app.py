@@ -860,13 +860,13 @@ for sid in section_order:
         )
         if df_agg_result is not None and cfg.get("show_market_share", True):
             if filters["region"] == "Всички":
-                show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national")
+                show_market_share_table(df_agg_result, period_col="Quarter", is_national=True, key_suffix="national", products_list=products_on_chart)
             else:
                 df_regional_share = calculate_regional_market_share(
                     df=df_filtered, products_list=products_on_chart, periods=periods, period_col="Quarter"
                 )
                 if not df_regional_share.empty and "Market_Share_%" in df_regional_share.columns:
-                    show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional")
+                    show_market_share_table(df_regional_share, period_col="Quarter", is_national=False, key_suffix="regional", products_list=products_on_chart)
     elif sid == "brick":
         st.markdown('<p class="section-header">🗺️ Разбивка по Brick (райони)</p>', unsafe_allow_html=True)
         create_brick_charts(

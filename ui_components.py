@@ -447,6 +447,8 @@ def calculate_metric_data(
     df_agg["_sort"] = df_agg[period_col].map(period_order)
     df_agg = df_agg.sort_values(["Drug_Name", "_sort"]).drop(columns=["_sort"])
     
+    # Само избраните продукти (без допълнителни от данните)
+    df_agg = df_agg[df_agg["Drug_Name"].isin(products_list)].copy()
     return df_agg, y_col, y_label
 
 
@@ -686,9 +688,10 @@ def show_market_share_table(
     period_col: str = "Quarter",
     is_national: bool = True,
     key_suffix: str = "national",
+    products_list: List[str] = None,
 ) -> None:
     """
-    Показва stacked bar chart с Market Share по всички тримесечия.
+    Показва stacked bar chart с Market Share – само избрания продукт + конкуренти.
     
     Параметри
     ---------
@@ -700,11 +703,16 @@ def show_market_share_table(
         Дали е национален (True) или регионален (False) market share
     key_suffix : str
         Суфикс за уникален key (за national/regional при едновременно показване)
+    products_list : list, optional
+        Само тези продукти да се показват (основен + конкуренти); ако е None, показва всички от df_agg
     """
     import plotly.graph_objects as go
     
     if "Market_Share_%" not in df_agg.columns:
         return
+    
+    if products_list:
+        df_agg = df_agg[df_agg["Drug_Name"].isin(products_list)].copy()
     
     # Различни заглавия в зависимост от типа
     if is_national:
