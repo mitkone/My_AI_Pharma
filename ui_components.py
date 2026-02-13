@@ -886,10 +886,17 @@ def create_brick_charts(
     else:
         df_geo_base = df[df[period_col] == geo_period].copy()
     
-    # Ако е избран регион от филтрите – показваме брикове в този регион (без допълнителен избор)
+    # Нормализиране за сравнение (category/whitespace)
+    def _region_match(ser, val):
+        if val is None or str(val).strip() == "" or str(val).strip().lower() == "всички":
+            return pd.Series(False, index=ser.index)
+        v = str(val).strip()
+        return ser.astype(str).str.strip() == v
+
+    # Ако е избран регион от филтрите – показваме САМО брикове в този регион
     if selected_region and selected_region != "Всички":
         by_region = False
-        df_geo = df_geo_base[df_geo_base["Region"] == selected_region].copy()
+        df_geo = df_geo_base[_region_match(df_geo_base["Region"], selected_region)].copy()
         group_col = "District"
         st.caption(f"📍 Брикове в регион **{selected_region}** (избран от филтрите)")
     else:
@@ -905,10 +912,10 @@ def create_brick_charts(
         else:
             sel_region_brick = st.selectbox(
                 "Избери регион",
-                sorted(df["Region"].dropna().unique().tolist()),
+                sorted(df["Region"].dropna().astype(str).str.strip().unique().tolist()),
                 key="sel_region_brick",
             )
-            df_geo = df_geo_base[df_geo_base["Region"] == sel_region_brick].copy()
+            df_geo = df_geo_base[_region_match(df_geo_base["Region"], sel_region_brick)].copy()
             group_col = "District"
     
     # Филтриране САМО на избрания продукт + конкуренти; макс. 20 серии за четлива графика
@@ -925,10 +932,14 @@ def create_brick_charts(
     df_geo_chart = df_geo[df_geo["Drug_Name"].isin(allowed_set)].copy()
     df_geo_agg = df_geo_chart.groupby([group_col, "Drug_Name"], as_index=False)["Units"].sum()
     df_geo_agg = df_geo_agg[df_geo_agg["Drug_Name"].isin(allowed_set)]
-    # Само региони от списъка във филтрите (да не се появяват Pleven-Lovech и др. които ги няма в падащото меню)
-    if allowed_region_names is not None and group_col == "Region":
-        allowed_r_set = set(str(r).strip() for r in allowed_region_names)
-        df_geo_agg = df_geo_agg[df_geo_agg[group_col].astype(str).str.strip().isin(allowed_r_set)]
+    # Само стойности от филтрираните данни (региони ИЛИ брикове в избрания регион)
+    if group_col == "Region" and allowed_region_names is not None:
+        allowed_set_grp = set(str(r).strip() for r in allowed_region_names)
+        df_geo_agg = df_geo_agg[df_geo_agg[group_col].astype(str).str.strip().isin(allowed_set_grp)]
+    elif group_col == "District":
+        # САМО брикове от df_geo (вече филтрирани по Region) – да не излизат брикове от други региони
+        allowed_districts = set(df_geo[group_col].dropna().astype(str).str.strip().unique())
+        df_geo_agg = df_geo_agg[df_geo_agg[group_col].astype(str).str.strip().isin(allowed_districts)]
     df_geo_agg = df_geo_agg.sort_values("Units", ascending=False)
     
     if df_geo_agg.empty:
@@ -994,15 +1005,22 @@ def create_brick_charts(
         if len(periods_sorted) >= 2:
             grp_col = group_col
             eff_region = selected_region if (selected_region and selected_region != "Всички") else sel_region_brick
-            df_grp = df[df["Region"] == eff_region] if grp_col == "District" and eff_region else df
+            if grp_col == "District" and eff_region:
+                df_grp = df[_region_match(df["Region"], eff_region)].copy()
+            else:
+                df_grp = df
             res = compute_last_vs_previous_rankings(
                 df_grp, sel_product, period_col, tuple(periods_sorted), group_col=grp_col
             )
             if res and not res["merged"].empty:
                 m = res["merged"].sort_values("Growth_%", ascending=True)
-                if allowed_region_names is not None and grp_col == "Region":
+                if grp_col == "Region" and allowed_region_names is not None:
                     allowed_r_set = set(str(r).strip() for r in allowed_region_names)
                     m = m[m["Region"].astype(str).str.strip().isin(allowed_r_set)]
+                elif grp_col == "District":
+                    # Само брикове от избрания регион (df_geo вече е филтриран)
+                    allowed_d = set(df_geo["District"].dropna().astype(str).str.strip().unique())
+                    m = m[m["Region"].astype(str).str.strip().isin(allowed_d)]  # "Region" колоната съдържа District при grp_col=District
                 if m.empty:
                     st.caption("Няма данни за ръст за избраните региони.")
                 else:
