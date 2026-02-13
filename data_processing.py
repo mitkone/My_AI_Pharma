@@ -338,8 +338,17 @@ def get_sorted_periods(df: pd.DataFrame, period_col: str = "Quarter") -> List[st
 @st.cache_data(ttl=config.CACHE_TTL, show_spinner=False)
 def load_data(data_dir: Path = config.DATA_DIR) -> pd.DataFrame:
     """
-    Единна точка за зареждане на данни: четене на файлове + подготовка за визуализация.
-    DataFrame се зарежда веднъж и се подава по референция към останалите модули.
+    Единна точка за зареждане на данни.
+    Приоритет: 1) pharma_data.parquet (бързо, малко RAM), 2) Excel файлове.
+    Parquet се генерира с: python build_parquet.py
     """
+    parquet_path = data_dir / "pharma_data.parquet"
+    if parquet_path.exists():
+        try:
+            df = pd.read_parquet(parquet_path)
+            logger.info(f"✓ Заредени {len(df):,} реда от Parquet (бързо зареждане)")
+            return df
+        except Exception as e:
+            logger.warning(f"Parquet грешка, преминаваме към Excel: {e}")
     df = load_all_excel_files(data_dir)
     return prepare_data_for_display(df)
