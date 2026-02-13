@@ -278,7 +278,7 @@ def create_regional_comparison(
         barmode='stack',
         height=max(config.MOBILE_CHART_HEIGHT, len(pivot) * 28),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
-        hovermode='closest', dragmode=False, margin=dict(l=100, r=30, t=30, b=20), font=dict(size=12),
+        hovermode='closest', dragmode=False, margin=dict(l=25, r=65, t=30, b=20), font=dict(size=12),
     )
     st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
 
@@ -308,7 +308,8 @@ def create_regional_comparison(
         for product in products_list:
             if product in pivot_growth.columns:
                 pct = pivot_growth[product]
-                txt = [f"{p:+.1f}%" for p in pct]
+                delta_vals = (pivot[product] - pivot_prev_reidx[product]).reindex(pivot_growth.index).fillna(0) if product in pivot.columns else pd.Series(0.0, index=pivot_growth.index)
+                txt = [f"{p:+.1f}% ({d:+,.0f} оп.)" for p, d in zip(pct, delta_vals)]
                 fig2.add_trace(go.Bar(
                     name=product,
                     x=pct.values,
@@ -316,7 +317,7 @@ def create_regional_comparison(
                     orientation='h',
                     text=txt,
                     textposition='outside',
-                    textfont=dict(size=10),
+                    textfont=dict(size=9),
                 ))
         fig2.add_vline(x=0, line_dash="dash", line_color="gray")
         n_reg = len(pivot_growth)
@@ -329,7 +330,7 @@ def create_regional_comparison(
             xaxis=dict(tickfont=dict(size=11)),
             yaxis=dict(title="", tickfont=dict(size=11), categoryorder="array", categoryarray=pivot_growth.index.tolist()),
             legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="center", x=0.5),
-            margin=dict(l=100, r=60, t=35, b=30),
+            margin=dict(l=25, r=70, t=35, b=30),
             font=dict(size=12),
         )
         st.plotly_chart(fig2, width="stretch", config=config.PLOTLY_CONFIG)

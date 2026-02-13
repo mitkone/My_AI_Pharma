@@ -973,13 +973,13 @@ def create_brick_charts(
         height=max(config.MOBILE_CHART_HEIGHT, len(df_geo_agg[group_col].unique()) * 28),
         legend_title="",
         xaxis=dict(title="", tickfont=dict(size=11)),
-        yaxis=dict(title="", tickfont=dict(size=11), categoryorder="total descending"),  # най-силен отгоре
+        yaxis=dict(title="", tickfont=dict(size=11), categoryorder="total descending"),  # най-много опаковки отгоре
         legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5),
         hovermode='closest',
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
-        margin=dict(l=100, r=30, t=30, b=20),
+        margin=dict(l=25, r=65, t=30, b=20),  # mobile: малко l, повече r за четливи цифри
         font=dict(size=12),
     )
     st.plotly_chart(fig_geo, width="stretch", config=config.PLOTLY_CONFIG)
@@ -1015,7 +1015,7 @@ def create_brick_charts(
                     m = m.copy()
                     m["Units_Delta"] = m["Last_Units"] - m["Previous_Units"]
                     lbl = "Брик" if grp_col == "District" else "Регион"
-                    txts = [f"{g:+.1f}%" for g in m["Growth_%"]]  # mobile: само % без (оп.) за четливост
+                    txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(m["Growth_%"], m["Units_Delta"])]
                     fig_g = px.bar(
                         m, x="Growth_%", y="Region", orientation="h",
                         color="Growth_%", color_continuous_scale=["#e74c3c", "#95a5a6", "#2ecc71"],
@@ -1023,12 +1023,17 @@ def create_brick_charts(
                         text=txts,
                         title=f"Ръст % по {lbl} – {sel_product}",
                     )
-                    fig_g.update_traces(textposition="outside", textfont=dict(size=10))
+                    fig_g.update_traces(
+                        textposition="outside",
+                        textfont=dict(size=9),
+                        hovertemplate="<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>",
+                        customdata=m["Units_Delta"],
+                    )
                     fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
                     fig_g.update_layout(
                         height=max(450, len(m) * 32), showlegend=False,
-                        xaxis_title="", yaxis_title="", coloraxis_showscale=False,  # mobile: без надписи
-                        margin=dict(l=70, r=30, t=25, b=20), dragmode=False,
+                        xaxis_title="", yaxis_title="", coloraxis_showscale=False,
+                        margin=dict(l=25, r=65, t=25, b=20), dragmode=False,  # mobile: малко l, повече r за цифрите
                         yaxis=dict(tickfont=dict(size=11)), xaxis=dict(tickfont=dict(size=11)),
                     )
                     st.plotly_chart(fig_g, width="stretch", config=config.PLOTLY_CONFIG)
@@ -1085,7 +1090,7 @@ def render_last_vs_previous_quarter(
     fig = go.Figure()
     merged_chart = merged_chart.copy()
     merged_chart["Units_Delta"] = merged_chart["Last_Units"] - merged_chart["Previous_Units"]
-    txts = [f"{g:+.1f}%" for g in merged_chart["Growth_%"]]  # mobile: само % за четливост
+    txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(merged_chart["Growth_%"], merged_chart["Units_Delta"])]
     fig.add_trace(go.Bar(
         x=merged_chart["Growth_%"],
         y=merged_chart["Region"],
@@ -1093,14 +1098,16 @@ def render_last_vs_previous_quarter(
         marker_color=colors,
         text=txts,
         textposition="outside",
-        textfont=dict(size=10),
+        textfont=dict(size=9),
+        customdata=merged_chart["Units_Delta"],
+        hovertemplate="<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>",
     ))
     fig.add_vline(x=0, line_dash="dash", line_color="gray", line_width=1)
     fig.update_layout(
         xaxis_title="",
         yaxis_title="",
         height=max(450, len(merged_chart) * 32),
-        margin=dict(l=70, r=30, t=20, b=30),
+        margin=dict(l=25, r=65, t=20, b=30),  # mobile: малко l, повече r за % и оп.
         showlegend=False,
         dragmode=False,
         yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist(), tickfont=dict(size=11)),

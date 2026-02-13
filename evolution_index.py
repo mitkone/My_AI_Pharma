@@ -231,7 +231,7 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], 
         xaxis_title="EI",
         yaxis_title="",
         height=800,
-        margin=dict(l=70, r=40, t=20, b=30),
+        margin=dict(l=25, r=65, t=20, b=30),  # mobile: малко l, повече r за четливи цифри
         showlegend=False,
         dragmode=False,
         xaxis=dict(zeroline=True, zerolinewidth=1),
