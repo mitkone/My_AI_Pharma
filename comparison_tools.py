@@ -270,8 +270,8 @@ def create_regional_comparison(
     fig.update_layout(
         title=f"Регионално разпределение - {period}",
         legend_title="",
-        xaxis=dict(title="Регион", tickangle=-45, title_font=dict(size=14), tickfont=dict(size=14), autorange=True),
-        yaxis=dict(title="Опаковки", title_font=dict(size=14), tickfont=dict(size=14), autorange=True),
+        xaxis=dict(title="", tickangle=-45, tickfont=dict(size=12), autorange=True),
+        yaxis=dict(title="", tickfont=dict(size=12), autorange=True),
         barmode='stack',
         height=config.MOBILE_CHART_HEIGHT,
         legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5),
@@ -306,7 +306,7 @@ def create_regional_comparison(
             if product in pivot_growth.columns:
                 pct = pivot_growth[product]
                 delta_vals = (pivot[product] - pivot_prev_reidx[product]).reindex(pivot_growth.index).fillna(0) if product in pivot.columns else pd.Series(0.0, index=pivot_growth.index)
-                txt = [f"{p:+.1f}% ({d:+,.0f} оп.)" for p, d in zip(pct, delta_vals)]
+                txt = [f"{p:+.1f}%" for p in pct]  # mobile: само %
                 fig2.add_trace(go.Bar(
                     name=product,
                     x=pivot_growth.index,
@@ -317,15 +317,15 @@ def create_regional_comparison(
         fig2.add_hline(y=0, line_dash="dash", line_color="gray")
         n_reg = len(pivot_growth)
         fig2.update_layout(
-            title=f"Ръст % по регион – {period} vs {prev_period}",
-            yaxis_title="Ръст (%)",
+            title=f"Ръст % – {period} vs {prev_period}",
+            yaxis_title="",
             barmode='group',
-            height=max(500, n_reg * 38),
+            height=max(500, n_reg * 34),
             legend_title="",
-            xaxis=dict(title="Регион", tickangle=-45, tickfont=dict(size=14)),
-            yaxis=dict(tickfont=dict(size=13)),
+            xaxis=dict(title="", tickangle=-45, tickfont=dict(size=11)),
+            yaxis=dict(tickfont=dict(size=11)),
             legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5),
-            margin=dict(l=80, r=80, t=40, b=80),
+            margin=dict(l=50, r=30, t=35, b=60),
             font=dict(size=12),
         )
         st.plotly_chart(fig2, width="stretch", config=config.PLOTLY_CONFIG)

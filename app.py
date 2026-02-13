@@ -78,6 +78,7 @@ def track_visit(
     team: str = None,
     product: str = None,
     region: str = None,
+    district: str = None,
     skip_if_admin: bool = True,
 ) -> None:
     """
@@ -89,7 +90,7 @@ def track_visit(
     if skip_if_admin and st.session_state.get("is_admin", False):
         return
     now_minute = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
-    key = f"_visit_{section_name}_{team or ''}_{product or ''}_{region or ''}"
+    key = f"_visit_{section_name}_{team or ''}_{product or ''}_{region or ''}_{district or ''}"
     if st.session_state.get(key) == now_minute:
         return
     st.session_state[key] = now_minute
@@ -98,8 +99,8 @@ def track_visit(
         is_new = not VISIT_LOG_PATH.exists()
         with VISIT_LOG_PATH.open("a", encoding="utf-8") as f:
             if is_new:
-                f.write("timestamp,section,team,product,region\n")
-            f.write(f"{now_minute},{section_name},{team or ''},{product or ''},{region or ''}\n")
+                f.write("timestamp,section,team,product,region,district\n")
+            f.write(f"{now_minute},{section_name},{team or ''},{product or ''},{region or ''},{district or ''}\n")
     except Exception:
         pass
 
@@ -117,15 +118,15 @@ def reset_analytics() -> None:
 def _load_analytics_df() -> pd.DataFrame:
     """Зарежда visits_log като DataFrame (за Admin таблиците)."""
     if not VISIT_LOG_PATH.exists():
-        return pd.DataFrame(columns=["timestamp", "section", "team", "product", "region"])
+        return pd.DataFrame(columns=["timestamp", "section", "team", "product", "region", "district"])
     try:
         df = pd.read_csv(VISIT_LOG_PATH)
-        for col in ["team", "product", "region"]:
+        for col in ["team", "product", "region", "district"]:
             if col not in df.columns:
                 df[col] = ""
         return df
     except Exception:
-        return pd.DataFrame(columns=["timestamp", "section", "team", "product", "region"])
+        return pd.DataFrame(columns=["timestamp", "section", "team", "product", "region", "district"])
 
 
 
@@ -452,6 +453,16 @@ if is_admin:
                     st.dataframe(df_reg, width="stretch", hide_index=True)
                 else:
                     st.caption("Няма данни по региони.")
+            if "district" in df_v.columns:
+                dist_counts = df_v[df_v["district"].astype(str).str.strip() != ""].groupby("district").size().sort_values(ascending=False)
+                if not dist_counts.empty:
+                    st.markdown("**По брикове**")
+                    df_br = pd.DataFrame({"Брик": dist_counts.index, "Брой гледания": dist_counts.values})
+                    st.dataframe(df_br.head(30), width="stretch", hide_index=True)
+                    if len(dist_counts) > 30:
+                        st.caption(f"Показани първите 30 от {len(dist_counts)} брика.")
+                else:
+                    st.caption("Няма данни по брикове.")
             if "team" in df_v.columns:
                 st.markdown("**По екипи**")
                 team_counts = df_v[df_v["team"].astype(str).str.strip() != ""].groupby("team").size().sort_values(ascending=False)
@@ -524,8 +535,9 @@ if is_admin:
 cfg = get_dashboard_config()
 
 # ============================================================================
-# QUICK SEARCH – автокомплит: пиши и избирай от предложенията
+# ФИЛТРИ – Регион и Медикамент отначало (ясно видими)
 # ============================================================================
+st.markdown('<p class="section-header">🔧 Избор на регион и медикамент</p>', unsafe_allow_html=True)
 
 import re
 def _is_atc_class(drug_name):
@@ -538,75 +550,23 @@ _all_drugs = sorted([
     if not _is_atc_class(d)
 ])
 
-st.markdown('<p class="section-header">🔍 Търсене на медикамент</p>', unsafe_allow_html=True)
-# Поле за търсене: при всяко натискане се обновява (без Enter), ако е инсталиран streamlit-keyup
+# Компактно търсене за бърз избор на медикамент (опционално)
 if st_keyup:
-    drug_filter = st_keyup(
-        "Пиши име на медикамент",
-        placeholder="напр. Lip, Crestor...",
-        key="drug_search_filter",
-        debounce=150,
-    )
+    drug_filter = st_keyup("🔍 Търсене (пиши име)", placeholder="напр. Lip, Crestor...", key="drug_search_filter", debounce=150)
 else:
-    drug_filter = st.text_input(
-        "Пиши име на медикамент",
-        placeholder="напр. Lip, Crestor... (натисни Enter за предложения)",
-        key="drug_search_filter",
-        help="Почни да пишеш – ще се появят предложения; избери с клик.",
-    )
+    drug_filter = st.text_input("🔍 Търсене (пиши име)", placeholder="напр. Lip, Crestor...", key="drug_search_filter")
 _filter = (drug_filter or "").strip().lower()
 filtered_drugs = [d for d in _all_drugs if _filter in (d or "").lower()] if _filter else []
+if _filter and filtered_drugs:
+    cols = st.columns(min(4, len(filtered_drugs[:12])))
+    for i, drug in enumerate(filtered_drugs[:12]):
+        with cols[i % len(cols)]:
+            if st.button(drug, key=f"qs_drug_{drug}", width="stretch"):
+                st.session_state["quick_search_drug"] = drug
+                st.rerun()
+elif not _filter and "quick_search_drug" in st.session_state:
+    del st.session_state["quick_search_drug"]
 
-# Избран медикамент: от сесия (след клик) или от текущ избор
-selected_drug = st.session_state.get("quick_search_drug", "")
-# Предложенията се показват винаги при въведен текст – и при смяна на медикамент (без да се изчистват филтрите)
-if _filter:
-    if filtered_drugs:
-        st.caption("Избери медикамент с клик:")
-        cols = st.columns(2)
-        for i, drug in enumerate(filtered_drugs[:24]):
-            with cols[i % 2]:
-                if st.button(drug, key=f"qs_drug_{drug}", width="stretch"):
-                    st.session_state["quick_search_drug"] = drug
-                    st.rerun()
-    else:
-        st.caption("Няма съвпадения – опитай друго име")
-elif not _filter:
-    if "quick_search_drug" in st.session_state:
-        del st.session_state["quick_search_drug"]
-
-# Докато не е избран медикамент – показваме само търсенето, без dashboard
-if not selected_drug:
-    st.info("👆 Започни да пишеш име на медикамент и избери един от предложенията, за да видиш dashboard-а.")
-    st.stop()
-
-st.session_state["quick_search_drug"] = selected_drug
-st.session_state["sb_product_search"] = selected_drug
-# sb_product се задава в create_filters чрез default_product – не го пипаме тук,
-# за да избегнем Streamlit warning: "widget with key sb_product was created with
-# default value but also had its value set via Session State API"
-st.success(f"✅ Избран: **{selected_drug}**")
-periods_temp = get_sorted_periods(df_raw)
-drug_data = df_raw[df_raw["Drug_Name"] == selected_drug].copy()
-if not drug_data.empty and len(periods_temp) >= 2:
-    last_period = periods_temp[-1]
-    prev_period = periods_temp[-2]
-    last_units = drug_data[drug_data["Quarter"] == last_period]["Units"].sum()
-    prev_units = drug_data[drug_data["Quarter"] == prev_period]["Units"].sum()
-    growth_pct = ((last_units - prev_units) / prev_units * 100) if prev_units > 0 else 0
-    regions_count = drug_data[drug_data["Quarter"] == last_period]["Region"].nunique()
-    growth_emoji = "📈" if growth_pct > 0 else "📉"
-    st.info(
-        f"{growth_emoji} **Продажби {last_period}**: {int(last_units):,} опак. ({growth_pct:+.1f}% vs {prev_period})  \n"
-        f"🗺️ **Региони**: {regions_count} | **Общо периоди**: {len(drug_data['Quarter'].unique())}"
-    )
-
-st.markdown("---")
-
-# ============================================================================
-# ФИЛТРИ – Регион, Brick, Медикамент, Конкуренти (sb_product вече синхронизиран с quick search)
-# ============================================================================
-st.markdown('<p class="section-header">🔧 Филтри</p>', unsafe_allow_html=True)
 FILTER_KEYS = [
     "sb_region",
     "sb_product",
@@ -629,8 +589,21 @@ with col_info:
         sources = sorted(df_raw["Source"].unique())
         st.caption(f"Заредени: {', '.join(sources)}")
 
-# Създаване на филтри (с default от Quick Search ако има) – в основното тяло, не в sidebar
+# Създаване на филтри (с default от търсене ако има)
 filters = create_filters(df_raw, default_product=st.session_state.get("quick_search_drug"), use_sidebar=False)
+
+# Ясен банер: избран медикамент и регион
+reg_disp = filters["region"] if filters["region"] != "Всички" else "Всички региони"
+brk_disp = filters.get("district", "Всички")
+if brk_disp and brk_disp != "Всички":
+    loc_str = f"📍 {reg_disp} | Брик: {brk_disp}"
+else:
+    loc_str = f"📍 {reg_disp}"
+st.markdown(
+    f'<div style="background: #1e293b; border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem; '
+    f'border: 1px solid #334155;"><b>💊 Медикамент:</b> {filters["product"]} &nbsp;|&nbsp; {loc_str}</div>',
+    unsafe_allow_html=True,
+)
 
 # Прилагане на филтрите
 df_filtered = apply_filters(df_raw, filters)
@@ -723,26 +696,64 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                                 ]["Units"].sum()
                                 market_share_pct = (product_last / class_last * 100) if class_last > 0 else 0
                 regions_count = selected_product_data[selected_product_data["Quarter"] == last_period]["Region"].nunique()
+                bricks_count = selected_product_data[selected_product_data["Quarter"] == last_period]["District"].nunique() if "District" in selected_product_data.columns else 0
                 growth_units = int(last_units - prev_units)
                 region_label = filters["region"] if filters["region"] != "Всички" else "Всички региони"
                 brick_label = filters["district"] if filters.get("district") and filters["district"] != "Всички" else "Всички Брикове"
                 ms_label = "MS (регион)" if filters["region"] != "Всички" else "MS (нац.)"
+                # AI Insights (най-добър/слаб регион, EI) – обединено в същата секция
+                best_region = worst_region = best_growth = worst_growth = None
+                avg_ei = None
+                try:
+                    use_bricks = filters.get("region") and filters["region"] != "Всички" and "District" in df_raw.columns
+                    grp_col = "District" if use_bricks else "Region"
+                    df_gr = df_raw[df_raw["Region"] == filters["region"]] if use_bricks else df_raw
+                    last_prev = compute_last_vs_previous_rankings(
+                        df_gr, filters["product"], "Quarter", tuple(periods), group_col=grp_col
+                    )
+                    if last_prev and not last_prev["merged"].empty:
+                        m = last_prev["merged"]
+                        if filters.get("allowed_region_names"):
+                            allow = set(str(r).strip() for r in filters["allowed_region_names"])
+                            m = m[m["Region"].astype(str).str.strip().isin(allow)]
+                        if not m.empty:
+                            best_row = m.sort_values("Growth_%", ascending=False).iloc[0]
+                            best_region, best_growth = best_row["Region"], float(best_row["Growth_%"])
+                            worst_row = m.sort_values("Growth_%", ascending=True).iloc[0]
+                            worst_region, worst_growth = worst_row["Region"], float(worst_row["Growth_%"])
+                    rows_ei, overall_ei = compute_ei_rows_and_overall(
+                        df_filtered, (filters["product"],), periods[-1], periods[-2], "Quarter"
+                    )
+                    avg_ei = float(overall_ei) if overall_ei is not None else None
+                except Exception:
+                    pass
+                ai_parts = []
+                if best_region is not None:
+                    ai_parts.append(f"Най-добър: <b>{best_region}</b> ({best_growth:+.1f}%)")
+                if worst_region is not None:
+                    ai_parts.append(f"Най-слаб: <b>{worst_region}</b> ({worst_growth:+.1f}%)")
+                if avg_ei is not None:
+                    ai_parts.append(f"EI: <b>{avg_ei:.1f}</b>")
+                ai_line = " | ".join(ai_parts) if ai_parts else ""
                 st.markdown(
                     f'<div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 12px; '
                     f'padding: 1.2rem 1.5rem; margin-bottom: 1rem; border: 1px solid #334155;">'
-                    f'<p style="margin: 0 0 12px 0; font-size: 1.1rem; font-weight: 600;">📊 Ключови показатели</p>'
+                    f'<p style="margin: 0 0 12px 0; font-size: 1.1rem; font-weight: 600;">📊 Ключови показатели & AI Insights</p>'
                     f'<p style="margin: 0 0 14px 0; font-size: 0.95rem; opacity: 0.9;">📍 {region_label} | Брик: {brick_label} | Период: {last_period}</p>'
-                    f'<div style="display: flex; gap: 2rem; flex-wrap: wrap;">'
-                    f'<span style="font-size: 1.25rem;"><b>Продажби:</b> {int(last_units):,} <span style="color: {"#22c55e" if growth_pct >= 0 else "#ef4444"};">({growth_pct:+.1f}%)</span></span>'
-                    f'<span style="font-size: 1.25rem;"><b>{ms_label}:</b> {market_share_pct:.2f}%</span>'
-                    f'<span style="font-size: 1.25rem;"><b>Региони:</b> {regions_count}</span>'
-                    f'<span style="font-size: 1.25rem;"><b>Промяна:</b> {growth_units:+,} оп.</span>'
-                    f'</div></div>',
+                    f'<div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 8px;">'
+                    f'<span style="font-size: 1.1rem;"><b>Продажби:</b> {int(last_units):,} <span style="color: {"#22c55e" if growth_pct >= 0 else "#ef4444"};">{growth_pct:+.1f}%</span></span>'
+                    f'<span style="font-size: 1.1rem;"><b>{ms_label}:</b> {market_share_pct:.2f}%</span>'
+                    f'<span style="font-size: 1.1rem;"><b>Региони:</b> {regions_count}</span>'
+                    f'<span style="font-size: 1.1rem;"><b>Брикове:</b> {bricks_count}</span>'
+                    f'<span style="font-size: 1.1rem;"><b>Промяна:</b> {growth_units:+,} оп.</span>'
+                    f'</div>'
+                    f'<p style="margin: 0; font-size: 0.95rem; opacity: 0.9;">{ai_line}</p>'
+                    f'</div>',
                     unsafe_allow_html=True,
                 )
 
         elif comp_id == "ai_insights":
-            display_ai_insights(df_raw, df_filtered, filters, periods, allowed_region_names=filters.get("allowed_region_names"))
+            pass  # обединено в performance_cards
 
         elif comp_id == "target_tracker":
             st.markdown("### 🎯 Target Tracker")
@@ -824,7 +835,7 @@ section_order = cfg.get("page_section_order", list(PAGE_SECTION_IDS))
 comp_level = "Национално ниво" if filters["region"] == "Всички" else f"Регионално: {filters['region']}"
 
 # Един запис на страница – не по секции (иначе 1 гледане = 5+ записа)
-track_visit("Page", team=selected_team_label, product=filters.get("product"), region=filters.get("region"))
+track_visit("Page", team=selected_team_label, product=filters.get("product"), region=filters.get("region"), district=filters.get("district"))
 
 # Голям видим блок: в кой регион сме (Всички или избран)
 sel_region = filters.get("region", "Всички")

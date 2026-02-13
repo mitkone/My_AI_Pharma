@@ -228,10 +228,10 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], 
     ))
     fig.add_vline(x=100, line_dash="dash", line_color="red", line_width=2)
     fig.update_layout(
-        xaxis_title="Еволюционен Индекс (EI)",
-        yaxis_title=yaxis_title,
+        xaxis_title="EI",
+        yaxis_title="",
         height=800,
-        margin=dict(l=80, r=60, t=20, b=40),
+        margin=dict(l=70, r=40, t=20, b=30),
         showlegend=False,
         dragmode=False,
         xaxis=dict(zeroline=True, zerolinewidth=1),
