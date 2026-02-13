@@ -54,7 +54,9 @@ def render_churn_alert_table(
     prev.columns = ["Drug_Name", "Previous"]
     curr = df[df[period_col] == last_period].groupby("Drug_Name")["Units"].sum().reset_index()
     curr.columns = ["Drug_Name", "Current"]
-    merged = prev.merge(curr, on="Drug_Name", how="outer").fillna(0)
+    merged = prev.merge(curr, on="Drug_Name", how="outer")
+    merged["Previous"] = merged["Previous"].fillna(0)
+    merged["Current"] = merged["Current"].fillna(0)
     merged["Change"] = merged["Current"] - merged["Previous"]
     merged["Change_%"] = np.where(merged["Previous"] == 0, 0, (merged["Change"] / merged["Previous"]) * 100)
     merged = merged.sort_values("Change", ascending=True).head(top_n)
@@ -85,7 +87,9 @@ def render_growth_leaders_table(
     prev.columns = ["Drug_Name", "Previous"]
     curr = df[df[period_col] == last_period].groupby("Drug_Name")["Units"].sum().reset_index()
     curr.columns = ["Drug_Name", "Current"]
-    merged = prev.merge(curr, on="Drug_Name", how="outer").fillna(0)
+    merged = prev.merge(curr, on="Drug_Name", how="outer")
+    merged["Previous"] = merged["Previous"].fillna(0)
+    merged["Current"] = merged["Current"].fillna(0)
     merged["Change"] = merged["Current"] - merged["Previous"]
     merged["Change_%"] = np.where(merged["Previous"] == 0, 0, (merged["Change"] / merged["Previous"]) * 100)
     merged = merged.sort_values("Change", ascending=False).head(top_n)

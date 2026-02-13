@@ -65,7 +65,10 @@ def compute_last_vs_previous_rankings(
     prev_df = sub.loc[sub[period_col] == prev_period].groupby(group_col, as_index=False)["Units"].sum()
     prev_df = prev_df.rename(columns={"Units": "Previous_Units"})
 
-    merged = last_df.merge(prev_df, on=group_col, how="outer").fillna(0)
+    merged = last_df.merge(prev_df, on=group_col, how="outer")
+    # fillna само за числовите колони (category колоните не приемат 0)
+    merged["Last_Units"] = merged["Last_Units"].fillna(0)
+    merged["Previous_Units"] = merged["Previous_Units"].fillna(0)
     prev_u = merged["Previous_Units"].values
     curr_u = merged["Last_Units"].values
     with np.errstate(divide="ignore", invalid="ignore"):
