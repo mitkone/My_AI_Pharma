@@ -535,38 +535,8 @@ if is_admin:
 cfg = get_dashboard_config()
 
 # ============================================================================
-# ФИЛТРИ – Регион и Медикамент отначало (ясно видими)
+# ФИЛТРИ – основна секция за избор
 # ============================================================================
-st.markdown('<p class="section-header">🔧 Избор на регион и медикамент</p>', unsafe_allow_html=True)
-
-import re
-def _is_atc_class(drug_name):
-    if pd.isna(drug_name):
-        return False
-    return bool(re.match(r'^[A-Z]\d{2}[A-Z]\d', str(drug_name).strip()))
-
-_all_drugs = sorted([
-    d for d in df_raw["Drug_Name"].dropna().unique()
-    if not _is_atc_class(d)
-])
-
-# Компактно търсене за бърз избор на медикамент (опционално)
-if st_keyup:
-    drug_filter = st_keyup("🔍 Търсене (пиши име)", placeholder="напр. Lip, Crestor...", key="drug_search_filter", debounce=150)
-else:
-    drug_filter = st.text_input("🔍 Търсене (пиши име)", placeholder="напр. Lip, Crestor...", key="drug_search_filter")
-_filter = (drug_filter or "").strip().lower()
-filtered_drugs = [d for d in _all_drugs if _filter in (d or "").lower()] if _filter else []
-if _filter and filtered_drugs:
-    cols = st.columns(min(4, len(filtered_drugs[:12])))
-    for i, drug in enumerate(filtered_drugs[:12]):
-        with cols[i % len(cols)]:
-            if st.button(drug, key=f"qs_drug_{drug}", width="stretch"):
-                st.session_state["quick_search_drug"] = drug
-                st.rerun()
-elif not _filter and "quick_search_drug" in st.session_state:
-    del st.session_state["quick_search_drug"]
-
 FILTER_KEYS = [
     "sb_region",
     "sb_product",
@@ -577,35 +547,36 @@ FILTER_KEYS = [
     "drug_search_filter",
     "drug_suggest_radio",
 ]
-col_reset, col_info = st.columns([1, 3])
+
+st.markdown(
+    '<div style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%); border-radius: 12px; '
+    'padding: 1rem 1.5rem; margin-bottom: 1rem; border: 2px solid #334155;"><p style="margin: 0; '
+    'font-size: 1.35rem; font-weight: 700;">🔧 Филтри</p></div>',
+    unsafe_allow_html=True,
+)
+col_reset, _ = st.columns([1, 4])
 with col_reset:
-    if st.button("🔄 Изчисти всички филтри", type="secondary", key="reset_filters_btn"):
+    if st.button("🔄 Изчисти филтри", type="secondary", key="reset_filters_btn"):
         for k in FILTER_KEYS:
             if k in st.session_state:
                 del st.session_state[k]
         st.rerun()
-with col_info:
-    if "Source" in df_raw.columns:
-        sources = sorted(df_raw["Source"].unique())
-        st.caption(f"Заредени: {', '.join(sources)}")
 
-# Създаване на филтри (с default от търсене ако има)
-filters = create_filters(df_raw, default_product=st.session_state.get("quick_search_drug"), use_sidebar=False)
+# Създаване на филтри – без подразбиране за медикамент
+filters = create_filters(df_raw, default_product=None, use_sidebar=False)
 
-# Ясен банер: избран медикамент и регион
-reg_disp = filters["region"] if filters["region"] != "Всички" else "Всички региони"
-brk_disp = filters.get("district", "Всички")
-if brk_disp and brk_disp != "Всички":
-    loc_str = f"📍 {reg_disp} | Брик: {brk_disp}"
-else:
-    loc_str = f"📍 {reg_disp}"
-st.markdown(
-    f'<div style="background: #1e293b; border-radius: 8px; padding: 0.6rem 1rem; margin-bottom: 1rem; '
-    f'border: 1px solid #334155;"><b>💊 Медикамент:</b> {filters["product"]} &nbsp;|&nbsp; {loc_str}</div>',
-    unsafe_allow_html=True,
-)
+# Компактен банер само ако е избран медикамент
+if filters.get("product"):
+    reg_disp = filters["region"] if filters["region"] != "Всички" else "Всички региони"
+    brk_disp = filters.get("district", "Всички")
+    loc_str = f"📍 {reg_disp}" + (f" | Брик: {brk_disp}" if brk_disp and brk_disp != "Всички" else "")
+    st.caption(f"**{filters['product']}** · {loc_str}")
 
-# Прилагане на филтрите
+# Прилагане на филтрите – ако няма избран медикамент, показваме само филтрите
+if not filters.get("product"):
+    st.info("👆 Избери медикамент от падащия списък, за да видиш данните.")
+    st.stop()
+
 df_filtered = apply_filters(df_raw, filters)
 
 # Селектор за метрика
@@ -701,9 +672,8 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                 region_label = filters["region"] if filters["region"] != "Всички" else "Всички региони"
                 brick_label = filters["district"] if filters.get("district") and filters["district"] != "Всички" else "Всички Брикове"
                 ms_label = "MS (регион)" if filters["region"] != "Всички" else "MS (нац.)"
-                # AI Insights (най-добър/слаб регион, EI) – обединено в същата секция
+                # AI Insights (най-добър/слаб регион) – без EI (има секция по-долу)
                 best_region = worst_region = best_growth = worst_growth = None
-                avg_ei = None
                 try:
                     use_bricks = filters.get("region") and filters["region"] != "Всички" and "District" in df_raw.columns
                     grp_col = "District" if use_bricks else "Region"
@@ -721,33 +691,23 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                             best_region, best_growth = best_row["Region"], float(best_row["Growth_%"])
                             worst_row = m.sort_values("Growth_%", ascending=True).iloc[0]
                             worst_region, worst_growth = worst_row["Region"], float(worst_row["Growth_%"])
-                    rows_ei, overall_ei = compute_ei_rows_and_overall(
-                        df_filtered, (filters["product"],), periods[-1], periods[-2], "Quarter"
-                    )
-                    avg_ei = float(overall_ei) if overall_ei is not None else None
                 except Exception:
                     pass
-                ai_parts = []
-                if best_region is not None:
-                    ai_parts.append(f"Най-добър: <b>{best_region}</b> ({best_growth:+.1f}%)")
-                if worst_region is not None:
-                    ai_parts.append(f"Най-слаб: <b>{worst_region}</b> ({worst_growth:+.1f}%)")
-                if avg_ei is not None:
-                    ai_parts.append(f"EI: <b>{avg_ei:.1f}</b>")
-                ai_line = " | ".join(ai_parts) if ai_parts else ""
+                ai_part = ""
+                if best_region is not None and worst_region is not None:
+                    ai_part = f'<span style="font-size: 0.9rem; opacity: 0.9;">Най-добър: {best_region} {best_growth:+.1f}% · Най-слаб: {worst_region} {worst_growth:+.1f}%</span>'
                 st.markdown(
-                    f'<div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 12px; '
-                    f'padding: 1.2rem 1.5rem; margin-bottom: 1rem; border: 1px solid #334155;">'
-                    f'<p style="margin: 0 0 12px 0; font-size: 1.1rem; font-weight: 600;">📊 Ключови показатели & AI Insights</p>'
-                    f'<p style="margin: 0 0 14px 0; font-size: 0.95rem; opacity: 0.9;">📍 {region_label} | Брик: {brick_label} | Период: {last_period}</p>'
-                    f'<div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 8px;">'
-                    f'<span style="font-size: 1.1rem;"><b>Продажби:</b> {int(last_units):,} <span style="color: {"#22c55e" if growth_pct >= 0 else "#ef4444"};">{growth_pct:+.1f}%</span></span>'
-                    f'<span style="font-size: 1.1rem;"><b>{ms_label}:</b> {market_share_pct:.2f}%</span>'
-                    f'<span style="font-size: 1.1rem;"><b>Региони:</b> {regions_count}</span>'
-                    f'<span style="font-size: 1.1rem;"><b>Брикове:</b> {bricks_count}</span>'
-                    f'<span style="font-size: 1.1rem;"><b>Промяна:</b> {growth_units:+,} оп.</span>'
+                    f'<div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 10px; '
+                    f'padding: 0.75rem 1rem; margin-bottom: 0.75rem; border: 1px solid #334155;">'
+                    f'<div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; font-size: 0.95rem;">'
+                    f'<span><b>Продажби:</b> {int(last_units):,} <span style="color: {"#22c55e" if growth_pct >= 0 else "#ef4444"};">{growth_pct:+.1f}%</span></span>'
+                    f'<span><b>{ms_label}:</b> {market_share_pct:.2f}%</span>'
+                    f'<span><b>Региони:</b> {regions_count}</span>'
+                    f'<span><b>Брикове:</b> {bricks_count}</span>'
+                    f'<span><b>Промяна:</b> {growth_units:+,} оп.</span>'
+                    f'<span style="opacity: 0.8;">· {last_period} · {region_label}</span>'
                     f'</div>'
-                    f'<p style="margin: 0; font-size: 0.95rem; opacity: 0.9;">{ai_line}</p>'
+                    f'<div style="margin-top: 4px;">{ai_part}</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )

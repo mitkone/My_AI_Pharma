@@ -32,64 +32,65 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
     ui = st.sidebar if use_sidebar else st
     ui.header("Филтри")
     
-    # Списъци САМО от реално присъстващи стойности (set() за да няма „фантомни” региони от category dtype)
+    # Списъци САМО от реално присъстващи стойности
     region_values = df["Region"].dropna().astype(str).str.strip()
     region_values = sorted(region_values[region_values != ""].unique().tolist())
     regions = ["Всички"] + region_values
-    allowed_region_names = region_values  # за графики и AI – само тези региони
-    drugs = sorted(df["Drug_Name"].dropna().unique().tolist())
+    allowed_region_names = region_values
+    drugs_raw = sorted(df["Drug_Name"].dropna().unique().tolist())
+    drugs = ["— Избери медикамент —"] + drugs_raw
     molecules = sorted(df["Molecule"].dropna().unique().tolist())
     has_district = "District" in df.columns
     districts = ["Всички"] + sorted(df["District"].dropna().unique().tolist()) if has_district else []
     
-    # Валидация: ако избраната стойност не е в списъка (напр. смяна на екип), нулираме session state
+    # Валидация
     if st.session_state.get("sb_region") not in regions:
         if "sb_region" in st.session_state:
             del st.session_state["sb_region"]
     if st.session_state.get("sb_district") not in districts:
         if "sb_district" in st.session_state:
             del st.session_state["sb_district"]
-    if drugs and st.session_state.get("sb_product") not in drugs:
+    if st.session_state.get("sb_product") not in drugs:
         if "sb_product" in st.session_state:
             del st.session_state["sb_product"]
     
-    # 1. Регион
-    sel_region = ui.selectbox(
-        "1. Регион",
-        regions,
-        index=0,
-        help="Географска област (Пловдив, Варна, Бургас...) - избери \"Всички\" за национален преглед",
-        key="sb_region",
-    )
+    # Регион и Медикамент в два реда/колони – по-видими и лесни за избор
+    c1, c2 = ui.columns(2)
+    with c1:
+        sel_region = ui.selectbox(
+            "Регион",
+            regions,
+            index=0,
+            help="Пловдив, Варна, Бургас... или Всички",
+            key="sb_region",
+        )
+    with c2:
+        idx = 0  # по подразбиране: "— Избери медикамент —"
+        if default_product and default_product in drugs_raw:
+            idx = drugs.index(default_product)
+        elif st.session_state.get("sb_product") in drugs:
+            idx = drugs.index(st.session_state["sb_product"])
+        sel_product = ui.selectbox(
+            "Медикамент (основен)",
+            drugs,
+            index=idx,
+            help="Избери медикамент от списъка",
+            key="sb_product",
+        )
     
-    # 2. Медикамент (основен продукт) – selectbox за лесна смяна
-    # Не задаваме session_state["sb_product"] преди виджета – само изчисляваме index,
-    # за да избегнем Streamlit warning за "default value + Session State API"
-    if default_product and default_product in drugs:
-        idx = drugs.index(default_product)
-    elif st.session_state.get("sb_product") in drugs:
-        idx = drugs.index(st.session_state["sb_product"])
-    else:
-        idx = 0
-    sel_product = ui.selectbox(
-        "2. Медикамент (основен)",
-        drugs,
-        index=idx,
-        help="Избери или смени медикамент от падащия списък",
-        key="sb_product",
-    )
-    
-    # 3. Brick (район)
+    # Brick (район) – под регион и медикамент
     sel_district = ui.selectbox(
-        "3. Brick (район)",
+        "Brick (район)",
         districts,
         index=0,
-        help="Малък географски район - налично само ако имаш \"Total Bricks\" данни",
+        help="Опционално – налично при Total Bricks данни",
         key="sb_district",
     ) if has_district else "Всички"
     
-    # 4. Конкуренти - включваме и категориите (класовете)
-    prod_sources = df[df["Drug_Name"] == sel_product]["Source"].unique()
+    # Конкуренти – само ако е избран реален медикамент
+    PLACEHOLDER = "— Избери медикамент —"
+    sel_product_effective = sel_product if sel_product != PLACEHOLDER and sel_product in drugs_raw else (drugs_raw[0] if drugs_raw else None)
+    prod_sources = df[df["Drug_Name"] == sel_product_effective]["Source"].unique() if sel_product_effective else []
     
     # Вземаме ВСИЧКИ Drug_Name от същата Source (категория)
     same_source_drugs = df[df["Source"].isin(prod_sources)]["Drug_Name"].unique()
@@ -100,7 +101,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
     competitor_drugs = []
     
     for item in same_source_drugs:
-        if item == sel_product:
+        if item == sel_product_effective:
             continue
         
         # Проверка дали е ATC клас:
@@ -158,9 +159,9 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
     
     competitor_options.extend(competitor_drugs_with_sales)
     
-    # Ако няма нищо, показваме всички медикаменти
+    # Ако няма нищо, показваме всички медикаменти (без placeholder)
     if not competitor_options:
-        competitor_options = [d for d in drugs if d != sel_product]
+        competitor_options = [d for d in drugs_raw if d != sel_product_effective]
     
     # Top 3: изчисли по избрания Region/Brick, запис в session_state, rerun
     col1, col2 = ui.columns([3, 1])
@@ -193,7 +194,7 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
                     opt_to_drug[drug_key.strip()] = opt
             top3_options = [opt_to_drug[d] for d in top3_drugs if d in opt_to_drug]
             st.session_state["sb_competitors"] = top3_options
-            st.session_state["selected_drugs"] = [sel_product] + top3_drugs
+            st.session_state["selected_drugs"] = [sel_product_effective] + top3_drugs if sel_product_effective else top3_drugs
             st.rerun()
     
     help_text = "📊 Класове (общи продажби) | Медикаменти сортирани по продажби (най-много → най-малко)"
@@ -221,10 +222,10 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
     
     return {
         "region": sel_region,
-        "product": sel_product,
+        "product": sel_product_effective if sel_product != PLACEHOLDER else None,
         "district": sel_district,
         "competitors": processed_competitors,  # Вече включва и класовете
-        "product_source": prod_sources[0] if prod_sources.size > 0 else None,
+        "product_source": prod_sources[0] if len(prod_sources) > 0 else None,
         "has_district": has_district,
         "allowed_region_names": allowed_region_names,  # само региони от списъка – за графики и AI
     }
