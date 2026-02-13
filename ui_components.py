@@ -895,13 +895,24 @@ def create_brick_charts(
             df_geo = df_geo_base[df_geo_base["Region"] == sel_region_brick].copy()
             group_col = "District"
     
-    # Филтриране на продукти и агрегация
-    df_geo_chart = df_geo[df_geo["Drug_Name"].isin(products_list)]
+    # Филтриране САМО на избрания продукт + конкуренти; макс. 20 серии за четлива графика
+    MAX_SERIES_BRICK = 20
+    raw_allowed = list(products_list) if products_list else []
+    if not raw_allowed:
+        st.info("Избери поне един продукт от филтрите.")
+        return
+    # Подредба: първо основният продукт, после конкурентите (ограничени)
+    allowed = [raw_allowed[0]] + [p for p in raw_allowed[1:] if p != raw_allowed[0]][: MAX_SERIES_BRICK - 1]
+    allowed_set = set(allowed)
+    if len(raw_allowed) > MAX_SERIES_BRICK:
+        st.caption(f"Показани са само първите {MAX_SERIES_BRICK} продукта/конкуренти.")
+    df_geo_chart = df_geo[df_geo["Drug_Name"].isin(allowed_set)].copy()
     df_geo_agg = df_geo_chart.groupby([group_col, "Drug_Name"], as_index=False)["Units"].sum()
+    df_geo_agg = df_geo_agg[df_geo_agg["Drug_Name"].isin(allowed_set)]
     df_geo_agg = df_geo_agg.sort_values("Units", ascending=False)
     
     if df_geo_agg.empty:
-        st.info("Няма данни.")
+        st.info("Няма данни за избраните продукти.")
         return
     
     # Bar chart за опаковки
