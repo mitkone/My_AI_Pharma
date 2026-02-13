@@ -11,6 +11,7 @@ import pandas as pd
 import plotly.express as px
 from typing import List, Optional, Tuple
 import config
+from logic import is_atc_class
 
 
 def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: bool = True) -> dict:
@@ -54,17 +55,9 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
         if "sb_product" in st.session_state:
             del st.session_state["sb_product"]
     
-    # Регион и Медикамент в два реда/колони – по-видими и лесни за избор
+    # Медикамент първо, след това Регион (mobile: по-важно е изборът на медикамент)
     c1, c2 = ui.columns(2)
     with c1:
-        sel_region = ui.selectbox(
-            "Регион",
-            regions,
-            index=0,
-            help="Пловдив, Варна, Бургас... или Всички",
-            key="sb_region",
-        )
-    with c2:
         idx = 0  # по подразбиране: "— Избери медикамент —"
         if default_product and default_product in drugs_raw:
             idx = drugs.index(default_product)
@@ -76,6 +69,14 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
             index=idx,
             help="Избери медикамент от списъка",
             key="sb_product",
+        )
+    with c2:
+        sel_region = ui.selectbox(
+            "Регион",
+            regions,
+            index=0,
+            help="Пловдив, Варна, Бургас... или Всички",
+            key="sb_region",
         )
     
     # Brick (район) – под регион и медикамент
@@ -346,27 +347,6 @@ def calculate_metric_data(
     # 3. Market Share % (спрямо целия клас/категория)
     # ВАЖНО: Изключваме ATC класовете от изчислението на total, за да избегнем дублиране
     # Класовете са сума на медикаментите, не трябва да се броят отделно
-    
-    def is_atc_class(drug_name):
-        """Проверява дали е ATC клас (напр. C10A1 STATINS)"""
-        if pd.isna(drug_name):
-            return False
-        parts = str(drug_name).split()
-        if not parts:
-            return False
-        first_word = parts[0]
-        # ATC код формат: 4-7 символа, започва с буква, има цифра, главни букви, има описание
-        return (
-            len(first_word) >= 4 and
-            len(first_word) <= 7 and
-            first_word[0].isalpha() and
-            any(c.isdigit() for c in first_word) and
-            first_word.isupper() and
-            len(parts) >= 2 and
-            drug_name not in ["GRAND TOTAL", "Grand Total"] and
-            not drug_name.startswith("Region")
-        )
-    
     # Market Share изчисление:
     # За медикамент: % спрямо КЛАСА (напр. C10A1 STATINS) за съответния период
     # За клас: винаги 100%
@@ -647,26 +627,6 @@ def calculate_regional_market_share(
     
     # Агрегиране по период и продукт
     df_agg = df_chart.groupby([period_col, "Drug_Name"], as_index=False)["Units"].sum()
-    
-    # Функция за проверка на ATC класове
-    def is_atc_class(drug_name):
-        if pd.isna(drug_name):
-            return False
-        parts = str(drug_name).split()
-        if not parts:
-            return False
-        first_word = parts[0]
-        return (
-            len(first_word) >= 4 and
-            len(first_word) <= 7 and
-            first_word[0].isalpha() and
-            any(c.isdigit() for c in first_word) and
-            first_word.isupper() and
-            len(parts) >= 2 and
-            drug_name not in ["GRAND TOTAL", "Grand Total"] and
-            not drug_name.startswith("Region")
-        )
-    
     # Намираме класа в ФИЛТРИРАНИТЕ данни (регионален)
     df_classes = df[df["Drug_Name"].apply(is_atc_class)].copy()
     

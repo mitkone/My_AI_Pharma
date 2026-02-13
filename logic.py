@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Tuple, Optional
 
 # --- Helpers (no Streamlit in logic, but cache is in this module) ---
 
-def _is_atc_class(drug_name) -> bool:
+def is_atc_class(drug_name) -> bool:
     """Проверява дали е ATC клас (напр. C10A1 STATINS)."""
     if pd.isna(drug_name):
         return False
@@ -140,7 +140,7 @@ def compute_ei_rows_and_overall(
         class_growth_pct = None
         ei = None
         if product_source:
-            df_classes = df[df["Drug_Name"].apply(_is_atc_class)]
+            df_classes = df[df["Drug_Name"].apply(is_atc_class)]
             matching = df_classes[df_classes["Source"] == product_source]["Drug_Name"].unique()
             if len(matching) > 0:
                 class_name = matching[0]

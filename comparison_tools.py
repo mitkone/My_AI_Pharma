@@ -274,7 +274,7 @@ def create_regional_comparison(
         title=f"Регионално разпределение - {period}",
         legend_title="",
         xaxis=dict(title="", tickfont=dict(size=11)),
-        yaxis=dict(title="", tickfont=dict(size=11), categoryorder="array", categoryarray=pivot.index.tolist()[::-1]),  # най-силен отгоре
+        yaxis=dict(title="", tickfont=dict(size=11), categoryorder="array", categoryarray=pivot.index.tolist()),  # най-много опаковки отгоре
         barmode='stack',
         height=max(config.MOBILE_CHART_HEIGHT, len(pivot) * 28),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),

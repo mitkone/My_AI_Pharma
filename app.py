@@ -53,7 +53,7 @@ from ui_components import (
 from ai_analysis import render_ai_analysis_tab
 from comparison_tools import create_regional_comparison
 from evolution_index import render_evolution_index_tab
-from logic import compute_last_vs_previous_rankings, compute_ei_rows_and_overall
+from logic import compute_last_vs_previous_rankings, compute_ei_rows_and_overall, is_atc_class
 from advanced_viz import (
     render_churn_alert_table,
     render_growth_leaders_table,
@@ -634,20 +634,6 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                 if "Source" in df_ms.columns:
                     product_source = selected_product_data["Source"].iloc[0] if len(selected_product_data) > 0 else None
                     if product_source:
-                        def is_atc_class(drug_name):
-                            if pd.isna(drug_name):
-                                return False
-                            parts = str(drug_name).split()
-                            if not parts:
-                                return False
-                            first_word = parts[0]
-                            return (
-                                len(first_word) >= 4 and len(first_word) <= 7 and
-                                first_word[0].isalpha() and any(c.isdigit() for c in first_word) and
-                                first_word.isupper() and len(parts) >= 2 and
-                                drug_name not in ["GRAND TOTAL", "Grand Total"] and
-                                not drug_name.startswith("Region")
-                            )
                         df_classes = df_ms[df_ms["Drug_Name"].apply(is_atc_class)].copy()
                         if len(df_classes) > 0:
                             matching_classes = df_classes[df_classes["Source"] == product_source]["Drug_Name"].unique()

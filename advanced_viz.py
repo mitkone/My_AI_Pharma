@@ -12,27 +12,7 @@ import numpy as np
 from typing import List
 
 import config
-from logic import compute_ei_rows_and_overall, compute_last_vs_previous_rankings
-
-
-def _is_atc_class(drug_name) -> bool:
-    if pd.isna(drug_name):
-        return False
-    s = str(drug_name)
-    parts = s.split()
-    if not parts:
-        return False
-    first = parts[0]
-    return (
-        len(first) >= 4
-        and len(first) <= 7
-        and first[0].isalpha()
-        and any(c.isdigit() for c in first)
-        and first.isupper()
-        and len(parts) >= 2
-        and drug_name not in ["GRAND TOTAL", "Grand Total"]
-        and not s.startswith("Region")
-    )
+from logic import compute_ei_rows_and_overall, compute_last_vs_previous_rankings, is_atc_class
 
 
 def render_churn_alert_table(
@@ -49,7 +29,7 @@ def render_churn_alert_table(
     last_period = periods[-1]
     prev_period = periods[-2]
     # Exclude ATC classes
-    df = df_raw[~df_raw["Drug_Name"].apply(_is_atc_class)]
+    df = df_raw[~df_raw["Drug_Name"].apply(is_atc_class)]
     prev = df[df[period_col] == prev_period].groupby("Drug_Name")["Units"].sum().reset_index()
     prev.columns = ["Drug_Name", "Previous"]
     curr = df[df[period_col] == last_period].groupby("Drug_Name")["Units"].sum().reset_index()
@@ -82,7 +62,7 @@ def render_growth_leaders_table(
         return
     last_period = periods[-1]
     prev_period = periods[-2]
-    df = df_raw[~df_raw["Drug_Name"].apply(_is_atc_class)]
+    df = df_raw[~df_raw["Drug_Name"].apply(is_atc_class)]
     prev = df[df[period_col] == prev_period].groupby("Drug_Name")["Units"].sum().reset_index()
     prev.columns = ["Drug_Name", "Previous"]
     curr = df[df[period_col] == last_period].groupby("Drug_Name")["Units"].sum().reset_index()

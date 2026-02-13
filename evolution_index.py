@@ -10,25 +10,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import Tuple, List, Dict, Any
 import config
-
-
-def _is_atc_class(drug_name) -> bool:
-    """Проверява дали е ATC клас (напр. C10A1 STATINS)."""
-    if pd.isna(drug_name):
-        return False
-    parts = str(drug_name).split()
-    if not parts:
-        return False
-    first_word = parts[0]
-    return (
-        len(first_word) >= 4 and len(first_word) <= 7
-        and first_word[0].isalpha()
-        and any(c.isdigit() for c in first_word)
-        and first_word.isupper()
-        and len(parts) >= 2
-        and drug_name not in ["GRAND TOTAL", "Grand Total"]
-        and not str(drug_name).startswith("Region")
-    )
+from logic import is_atc_class
 
 
 def _get_location_label(filters: dict) -> str:
@@ -102,7 +84,7 @@ def render_evolution_index_tab(
     location_label = "Всички региони" if location_mode == "national" else _get_location_label(filters)
     
     drugs_for_select = sorted(
-        df[~df["Drug_Name"].apply(_is_atc_class)]["Drug_Name"].unique()
+        df[~df["Drug_Name"].apply(is_atc_class)]["Drug_Name"].unique()
     )
     
     if not drugs_for_select:
