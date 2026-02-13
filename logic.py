@@ -68,7 +68,8 @@ def compute_last_vs_previous_rankings(
     merged = last_df.merge(prev_df, on=group_col, how="outer").fillna(0)
     prev_u = merged["Previous_Units"].values
     curr_u = merged["Last_Units"].values
-    merged["Growth_%"] = np.where(prev_u == 0, np.where(curr_u > 0, 100.0, 0.0), ((curr_u - prev_u) / prev_u) * 100)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        merged["Growth_%"] = np.where(prev_u == 0, np.where(curr_u > 0, 100.0, 0.0), ((curr_u - prev_u) / prev_u) * 100)
     merged = merged.sort_values("Growth_%", ascending=False).reset_index(drop=True)
     merged["Rank"] = range(1, len(merged) + 1)
     merged = merged.rename(columns={group_col: "Region"})

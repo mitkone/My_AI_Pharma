@@ -253,7 +253,7 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
     )
     
     # Бутон за анализ
-    if st.button("🚀 Анализирай с AI + Code", key="ai_analyze", type="primary", use_container_width=True):
+    if st.button("🚀 Анализирай с AI + Code", key="ai_analyze", type="primary", width="stretch"):
         if not ai_question or not ai_question.strip():
             st.warning("Въведи въпрос.")
             return
@@ -304,7 +304,7 @@ def render_ai_analysis_tab(df: pd.DataFrame, sel_product: str, competitors: list
                 # Mobile-friendly chart display
                 st.plotly_chart(
                     result['figure'],
-                    use_container_width=True,
+                    width="stretch",
                     config=config.PLOTLY_CONFIG
                 )
             

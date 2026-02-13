@@ -165,7 +165,7 @@ def create_period_comparison(
         uirevision="constant",
     )
     
-    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
+    st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
     
     # Таблица с промени
     st.subheader("Промени (%)")
@@ -205,7 +205,7 @@ def create_period_comparison(
     
     st.dataframe(
         styled_df,
-        use_container_width=True,
+        width="stretch",
         height=min(400, len(display_df) * 35 + 50)
     )
 
@@ -270,7 +270,7 @@ def create_regional_comparison(
         legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5),
         hovermode='closest', dragmode=False, margin=dict(l=0, r=0, t=30, b=0), font=dict(size=12),
     )
-    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
+    st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
 
     # 2. Графика за ръст % под опаковките (като в секция Опаковки по Brick)
     st.markdown("#### 📈 Ръст % спрямо предишно тримесечие")
@@ -321,6 +321,6 @@ def create_regional_comparison(
             margin=dict(l=80, r=80, t=40, b=80),
             font=dict(size=12),
         )
-        st.plotly_chart(fig2, use_container_width=True, config=config.PLOTLY_CONFIG)
+        st.plotly_chart(fig2, width="stretch", config=config.PLOTLY_CONFIG)
     else:
         st.caption("Няма данни за предишния период за ръст.")

@@ -319,7 +319,7 @@ def calculate_metric_data(
     df_agg = df_agg.merge(df_abs, on=["Drug_Name", period_col], how="left")
     
     # 2. % Промяна (ръст спрямо предходен период)
-    pct_change = pivot_units.pct_change(axis=1) * 100
+    pct_change = pivot_units.pct_change(axis=1, fill_method=None) * 100
     df_pct = pct_change.reset_index().melt(
         id_vars="Drug_Name",
         var_name=period_col,
@@ -592,7 +592,7 @@ def create_timeline_chart(
         font=dict(size=12),
     )
     
-    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
+    st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
     
     # Връщаме и df_agg за да можем да покажем Market Share данни извън функцията
     return df_agg
@@ -793,7 +793,7 @@ def show_market_share_table(
     
     st.plotly_chart(
         fig,
-        use_container_width=True,
+        width="stretch",
         config={'doubleClick': 'reset', 'displayModeBar': False},
     )
     
@@ -944,7 +944,7 @@ def create_brick_charts(
         margin=dict(l=0, r=0, t=30, b=0),
         font=dict(size=12),
     )
-    st.plotly_chart(fig_geo, use_container_width=True, config=config.PLOTLY_CONFIG)
+    st.plotly_chart(fig_geo, width="stretch", config=config.PLOTLY_CONFIG)
 
     # Графика за ръст % – брикове (при регион/избран регион) или региони (при Всички + Региони)
     st.markdown("#### 📈 Ръст % спрямо последно тримесечие")
@@ -979,7 +979,7 @@ def create_brick_charts(
                     margin=dict(l=120, r=100), dragmode=False,
                     yaxis=dict(tickfont=dict(size=14)), xaxis=dict(tickfont=dict(size=12)),
                 )
-                st.plotly_chart(fig_g, use_container_width=True, config=config.PLOTLY_CONFIG)
+                st.plotly_chart(fig_g, width="stretch", config=config.PLOTLY_CONFIG)
             else:
                 st.caption("Няма данни за ръст.")
         else:
@@ -1047,4 +1047,4 @@ def render_last_vs_previous_quarter(
         yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist(), tickfont=dict(size=14)),
         xaxis=dict(tickfont=dict(size=12)),
     )
-    st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
+    st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)

@@ -88,7 +88,7 @@ def track_visit(
     """
     if skip_if_admin and st.session_state.get("is_admin", False):
         return
-    now_minute = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    now_minute = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M")
     key = f"_visit_{section_name}_{team or ''}_{product or ''}_{region or ''}"
     if st.session_state.get(key) == now_minute:
         return
@@ -319,15 +319,15 @@ if not selected_team_label:
     st.markdown("**Избери екип**")
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("**Team 1**", use_container_width=True, key="btn_t1", type="primary"):
+        if st.button("**Team 1**", width="stretch", key="btn_t1", type="primary"):
             st.session_state["selected_team"] = "Team 1"
             st.rerun()
     with c2:
-        if st.button("**Team 2**", use_container_width=True, key="btn_t2", type="primary"):
+        if st.button("**Team 2**", width="stretch", key="btn_t2", type="primary"):
             st.session_state["selected_team"] = "Team 2"
             st.rerun()
     with c3:
-        if st.button("**Team 3**", use_container_width=True, key="btn_t3", type="primary"):
+        if st.button("**Team 3**", width="stretch", key="btn_t3", type="primary"):
             st.session_state["selected_team"] = "Team 3"
             st.rerun()
 
@@ -440,7 +440,7 @@ if is_admin:
                 if not reg_counts.empty:
                     st.markdown("**По региони**")
                     df_reg = pd.DataFrame({"Регион": reg_counts.index, "Брой гледания": reg_counts.values})
-                    st.dataframe(df_reg, use_container_width=True, hide_index=True)
+                    st.dataframe(df_reg, width="stretch", hide_index=True)
                 else:
                     st.caption("Няма данни по региони.")
             if "team" in df_v.columns:
@@ -448,7 +448,7 @@ if is_admin:
                 team_counts = df_v[df_v["team"].astype(str).str.strip() != ""].groupby("team").size().sort_values(ascending=False)
                 if not team_counts.empty:
                     df_teams = pd.DataFrame({"Екип": team_counts.index, "Брой гледания": team_counts.values})
-                    st.dataframe(df_teams, use_container_width=True, hide_index=True)
+                    st.dataframe(df_teams, width="stretch", hide_index=True)
                 else:
                     st.caption("Няма данни по екипи.")
             st.markdown("**По медикаменти (и екип)**")
@@ -456,7 +456,7 @@ if is_admin:
             if not df_prod.empty:
                 med_counts = df_prod.groupby(["product", "team"]).size().reset_index(name="Брой гледания")
                 med_counts = med_counts.rename(columns={"product": "Медикамент", "team": "Екип"}).sort_values("Брой гледания", ascending=False)
-                st.dataframe(med_counts, use_container_width=True, hide_index=True)
+                st.dataframe(med_counts, width="stretch", hide_index=True)
             else:
                 st.caption("Няма данни по медикаменти.")
         else:
@@ -557,7 +557,7 @@ if _filter:
         cols = st.columns(2)
         for i, drug in enumerate(filtered_drugs[:24]):
             with cols[i % 2]:
-                if st.button(drug, key=f"qs_drug_{drug}", use_container_width=True):
+                if st.button(drug, key=f"qs_drug_{drug}", width="stretch"):
                     st.session_state["quick_search_drug"] = drug
                     st.rerun()
     else:
@@ -752,7 +752,7 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                     trend_df = df_chart.groupby("Quarter", as_index=False)["Units"].sum()
                     fig_t = px.line(trend_df, x="Quarter", y="Units", title="Тренд по периоди (избрани продукти)")
                     fig_t.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10), dragmode=False)
-                    st.plotly_chart(fig_t, use_container_width=True, config=config.PLOTLY_CONFIG)
+                    st.plotly_chart(fig_t, width="stretch", config=config.PLOTLY_CONFIG)
                 except Exception:
                     st.caption("Недостатъчно данни за графика.")
             else:
@@ -764,7 +764,7 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                 last_p = periods[-1]
                 reg = df_filtered[df_filtered["Quarter"] == last_p].groupby("Region")["Units"].sum().sort_values(ascending=False).reset_index()
                 reg.columns = ["Region", "Units"]
-                st.dataframe(reg, use_container_width=True, height=280)
+                st.dataframe(reg, width="stretch", height=280)
             else:
                 st.caption("Няма регионни данни за последния период.")
 
@@ -773,7 +773,7 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
             if not df_chart.empty:
                 by_drug = df_chart.groupby("Drug_Name")["Units"].sum().sort_values(ascending=False).head(10).reset_index()
                 by_drug.columns = ["Медикамент", "Общо опаковки"]
-                st.dataframe(by_drug, use_container_width=True, height=220)
+                st.dataframe(by_drug, width="stretch", height=220)
             else:
                 st.caption("Няма данни за детайлен преглед.")
 

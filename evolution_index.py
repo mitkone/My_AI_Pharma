@@ -180,7 +180,7 @@ def render_evolution_index_tab(
         st.markdown(chart_title)
         is_brick = location_mode == "brick"
         fig = _build_ei_region_figure(tuple(labels_ei), tuple(values_ei), yaxis_title="Брик" if is_brick else "Регион")
-        st.plotly_chart(fig, use_container_width=True, config=config.PLOTLY_CONFIG)
+        st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
         st.caption("Графиката показва сравнително представяне на избраното портфолио по региони за избраните периоди.")
 
     # Таблица: Резултати по медикамент
@@ -208,7 +208,7 @@ def render_evolution_index_tab(
         "EI": f"{overall_ei:.1f}" if overall_ei is not None else "—",
     }
     df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
-    st.dataframe(df_table, use_container_width=True, hide_index=True)
+    st.dataframe(df_table, width="stretch", hide_index=True)
 
 
 @st.cache_resource(show_spinner=False)

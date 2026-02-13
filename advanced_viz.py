@@ -64,7 +64,7 @@ def render_churn_alert_table(
     merged["Change_%"] = merged["Change_%"].round(1)
     merged.columns = ["Entity", "Previous", "Current", "Change", "Change %"]
     st.caption(f"Top {top_n} products with biggest drop in sales ({prev_period} → {last_period}).")
-    st.dataframe(merged, use_container_width=True, height=320)
+    st.dataframe(merged, width="stretch", height=320)
 
 
 def render_growth_leaders_table(
@@ -95,7 +95,7 @@ def render_growth_leaders_table(
     merged["Change_%"] = merged["Change_%"].round(1)
     merged.columns = ["Entity", "Previous", "Current", "Change", "Change %"]
     st.caption(f"Top {top_n} products with biggest growth ({prev_period} → {last_period}).")
-    st.dataframe(merged, use_container_width=True, height=320)
+    st.dataframe(merged, width="stretch", height=320)
 
 
 def render_regional_growth_table(
@@ -126,4 +126,4 @@ def render_regional_growth_table(
     merged["Growth %"] = merged["Growth %"].round(1)
     merged = merged.sort_values("Growth %", ascending=False)
     st.caption(f"Regional growth for {sel_product} ({periods[-2]} → {periods[-1]}).")
-    st.dataframe(merged, use_container_width=True, height=320)
+    st.dataframe(merged, width="stretch", height=320)
