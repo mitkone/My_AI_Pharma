@@ -32,12 +32,23 @@ def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: b
     ui = st.sidebar if use_sidebar else st
     ui.header("Филтри")
     
-    # Списъци от уникални стойности
-    regions = ["Всички"] + sorted(df["Region"].unique())
-    drugs = sorted(df["Drug_Name"].unique())
-    molecules = sorted(df["Molecule"].unique())
+    # Списъци САМО от данните на текущия екип – региони/продукти които ги няма в данните не се показват
+    regions = ["Всички"] + sorted(df["Region"].dropna().unique().tolist())
+    drugs = sorted(df["Drug_Name"].dropna().unique().tolist())
+    molecules = sorted(df["Molecule"].dropna().unique().tolist())
     has_district = "District" in df.columns
-    districts = ["Всички"] + sorted(df["District"].unique()) if has_district else []
+    districts = ["Всички"] + sorted(df["District"].dropna().unique().tolist()) if has_district else []
+    
+    # Валидация: ако избраната стойност не е в списъка (напр. смяна на екип), нулираме session state
+    if st.session_state.get("sb_region") not in regions:
+        if "sb_region" in st.session_state:
+            del st.session_state["sb_region"]
+    if st.session_state.get("sb_district") not in districts:
+        if "sb_district" in st.session_state:
+            del st.session_state["sb_district"]
+    if drugs and st.session_state.get("sb_product") not in drugs:
+        if "sb_product" in st.session_state:
+            del st.session_state["sb_product"]
     
     # 1. Регион
     sel_region = ui.selectbox(
@@ -889,7 +900,7 @@ def create_brick_charts(
         else:
             sel_region_brick = st.selectbox(
                 "Избери регион",
-                sorted(df["Region"].unique()),
+                sorted(df["Region"].dropna().unique().tolist()),
                 key="sel_region_brick",
             )
             df_geo = df_geo_base[df_geo_base["Region"] == sel_region_brick].copy()

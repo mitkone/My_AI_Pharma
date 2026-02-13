@@ -383,9 +383,13 @@ if df_raw.empty:
         st.rerun()
     st.stop()
 
-# Малък бутон за смяна на екип
+# Малък бутон за смяна на екип – нулираме и филтрите, за да не остават региони/продукти от другия екип
 if st.button(f"🔄 Смени екип (сега: {selected_team_label})"):
     del st.session_state["selected_team"]
+    for k in ("sb_region", "sb_product", "sb_product_search", "sb_district", "sb_competitors",
+              "quick_search_drug", "drug_search_filter", "drug_suggest_radio"):
+        if k in st.session_state:
+            del st.session_state[k]
     st.rerun()
 
 is_admin = st.session_state.get("is_admin", False)
