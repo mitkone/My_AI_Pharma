@@ -18,7 +18,7 @@ except ImportError:
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -88,7 +88,7 @@ def track_visit(
     """
     if skip_if_admin and st.session_state.get("is_admin", False):
         return
-    now_minute = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M")
+    now_minute = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
     key = f"_visit_{section_name}_{team or ''}_{product or ''}_{region or ''}"
     if st.session_state.get(key) == now_minute:
         return
