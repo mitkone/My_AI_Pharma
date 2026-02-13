@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from typing import Tuple, List, Dict, Any
 import config
 from logic import is_atc_class
+from dashboard_config import get_chart_sort_order
 
 
 def _get_location_label(filters: dict) -> str:
@@ -217,6 +218,9 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], 
         showlegend=False,
         dragmode=False,
         xaxis=dict(zeroline=True, zerolinewidth=1),
-        yaxis=dict(tickfont=dict(size=12), categoryorder='total ascending'),
+        yaxis=dict(
+        tickfont=dict(size=12),
+        categoryorder="total descending" if get_chart_sort_order() == "desc" else "total ascending",
+    ),
     )
     return fig

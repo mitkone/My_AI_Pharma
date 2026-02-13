@@ -12,6 +12,7 @@ import plotly.express as px
 from typing import List, Optional, Tuple
 import config
 from logic import is_atc_class
+from dashboard_config import get_chart_sort_order
 
 
 def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: bool = True) -> dict:
@@ -933,7 +934,10 @@ def create_brick_charts(
         height=max(config.MOBILE_CHART_HEIGHT, len(df_geo_agg[group_col].unique()) * 28),
         legend_title="",
         xaxis=dict(title="", tickfont=dict(size=11)),
-        yaxis=dict(title="", tickfont=dict(size=11), categoryorder="total descending"),  # най-много опаковки отгоре
+        yaxis=dict(
+            title="", tickfont=dict(size=11),
+            categoryorder="total descending" if get_chart_sort_order() == "desc" else "total ascending",
+        ),
         legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5),
         hovermode='closest',
         dragmode=False,
@@ -990,11 +994,18 @@ def create_brick_charts(
                         customdata=m["Units_Delta"],
                     )
                     fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
+                    arr = m["Region"].tolist()
+                    cat_arr = arr[::-1] if get_chart_sort_order() == "desc" else arr
                     fig_g.update_layout(
                         height=max(450, len(m) * 32), showlegend=False,
                         xaxis_title="", yaxis_title="", coloraxis_showscale=False,
-                        margin=dict(l=25, r=65, t=25, b=20), dragmode=False,  # mobile: малко l, повече r за цифрите
-                        yaxis=dict(tickfont=dict(size=11)), xaxis=dict(tickfont=dict(size=11)),
+                        margin=dict(l=25, r=65, t=25, b=20), dragmode=False,
+                        yaxis=dict(
+                            categoryorder="array",
+                            categoryarray=cat_arr,
+                            tickfont=dict(size=11),
+                        ),
+                        xaxis=dict(tickfont=dict(size=11)),
                     )
                     st.plotly_chart(fig_g, width="stretch", config=config.PLOTLY_CONFIG)
             else:
@@ -1070,7 +1081,11 @@ def render_last_vs_previous_quarter(
         margin=dict(l=25, r=65, t=20, b=30),  # mobile: малко l, повече r за % и оп.
         showlegend=False,
         dragmode=False,
-        yaxis=dict(categoryorder="array", categoryarray=merged_chart["Region"].tolist(), tickfont=dict(size=11)),
+        yaxis=dict(
+            categoryorder="array",
+            categoryarray=merged_chart["Region"].tolist()[::-1] if get_chart_sort_order() == "desc" else merged_chart["Region"].tolist(),
+            tickfont=dict(size=11),
+        ),
         xaxis=dict(tickfont=dict(size=11)),
     )
     st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)

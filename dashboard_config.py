@@ -74,6 +74,8 @@ DEFAULT_DASHBOARD_CONFIG: dict[str, Any] = {
     # Ред на главните секции на страницата (за Admin преподреждане)
     "page_section_order": list(PAGE_SECTION_IDS),
     **{f"show_section_{sid}": True for sid in PAGE_SECTION_IDS},
+    # Подредба на графиките: "desc" = най-голямо→най-малко, "asc" = най-малко→най-голямо
+    "chart_sort_order": "desc",
 }
 
 
@@ -128,6 +130,12 @@ def get_dashboard_config() -> dict:
         loaded = load_config_from_json()
         st.session_state["dashboard_config"] = loaded if loaded else DEFAULT_DASHBOARD_CONFIG.copy()
     return st.session_state["dashboard_config"]
+
+
+def get_chart_sort_order() -> str:
+    """Връща 'desc' (най-голямо→най-малко) или 'asc' (най-малко→най-голямо)."""
+    cfg = get_dashboard_config()
+    return cfg.get("chart_sort_order", "desc")
 
 
 def show_component_enabled(cfg: dict, component_id: str) -> bool:

@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional
 import config
+from dashboard_config import get_chart_sort_order
 
 
 def create_period_comparison(
@@ -274,7 +275,11 @@ def create_regional_comparison(
         title=f"Регионално разпределение - {period}",
         legend_title="",
         xaxis=dict(title="", tickfont=dict(size=11)),
-        yaxis=dict(title="", tickfont=dict(size=11), categoryorder="array", categoryarray=pivot.index.tolist()),  # най-много опаковки отгоре
+        yaxis=dict(
+        title="", tickfont=dict(size=11),
+        categoryorder="array",
+        categoryarray=pivot.index.tolist() if get_chart_sort_order() == "desc" else pivot.index.tolist()[::-1],
+    ),
         barmode='stack',
         height=max(config.MOBILE_CHART_HEIGHT, len(pivot) * 28),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
@@ -328,7 +333,11 @@ def create_regional_comparison(
             height=max(500, n_reg * 32),
             legend_title="",
             xaxis=dict(tickfont=dict(size=11)),
-            yaxis=dict(title="", tickfont=dict(size=11), categoryorder="array", categoryarray=pivot_growth.index.tolist()),
+            yaxis=dict(
+            title="", tickfont=dict(size=11),
+            categoryorder="array",
+            categoryarray=pivot_growth.index.tolist() if get_chart_sort_order() == "desc" else pivot_growth.index.tolist()[::-1],
+        ),
             legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="center", x=0.5),
             margin=dict(l=25, r=70, t=35, b=30),
             font=dict(size=12),

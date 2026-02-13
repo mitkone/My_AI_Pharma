@@ -488,8 +488,30 @@ if is_admin:
             st.rerun()
 
         st.markdown("---")
-        st.markdown("**Подредба на секции** – галочка = видима, ↑↓ = ред")
+        st.markdown("**Подредба на графики** – във всички секции")
         cfg = get_dashboard_config()
+        sort_opts = [
+            ("desc", "Най-голямо → най-малко (напр. Pleven отгоре)"),
+            ("asc", "Най-малко → най-голямо"),
+        ]
+        current_sort = cfg.get("chart_sort_order", "desc")
+
+        def _on_sort_change():
+            c = get_dashboard_config()
+            c["chart_sort_order"] = st.session_state.get("admin_chart_sort", "desc")
+            save_config_to_json(c)
+
+        st.radio(
+            "Подредба на категории в графиките",
+            options=[v[0] for v in sort_opts],
+            format_func=lambda x: next(lbl for k, lbl in sort_opts if k == x),
+            index=0 if current_sort == "desc" else 1,
+            key="admin_chart_sort",
+            on_change=_on_sort_change,
+        )
+
+        st.markdown("---")
+        st.markdown("**Подредба на секции** – галочка = видима, ↑↓ = ред")
 
         def _save_section_config():
             c = get_dashboard_config()
