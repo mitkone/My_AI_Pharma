@@ -246,8 +246,8 @@ def prepare_data_for_display(df: pd.DataFrame) -> pd.DataFrame:
     except Exception:
         df["Molecule"] = "Other"
     
-    # Конвертиране на Units в числа
-    df["Units"] = pd.to_numeric(df["Units"], errors="coerce")
+    # Конвертиране на Units в числа (float32 за по-малко RAM)
+    df["Units"] = pd.to_numeric(df["Units"], errors="coerce").astype("float32")
     
     # Премахване на редове без Units
     initial_len = len(df)
@@ -255,6 +255,11 @@ def prepare_data_for_display(df: pd.DataFrame) -> pd.DataFrame:
     removed = initial_len - len(df)
     if removed > 0:
         logger.info(f"Премахнати {removed} реда без валидни Units")
+    
+    # Оптимизация за памет: category за текстови колони (до ~50% по-малко RAM)
+    for col in ["Region", "Drug_Name", "Quarter", "Source", "District", "Molecule"]:
+        if col in df.columns and df[col].dtype == "object":
+            df[col] = df[col].astype("category")
     
     return df
 
