@@ -12,7 +12,7 @@ import plotly.express as px
 from typing import List, Optional, Tuple
 import config
 from logic import is_atc_class
-from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color
+from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color, get_growth_chart_display
 
 
 def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: bool = True) -> dict:
@@ -983,7 +983,13 @@ def create_brick_charts(
                     m = m.copy()
                     m["Units_Delta"] = m["Last_Units"] - m["Previous_Units"]
                     lbl = "Брик" if grp_col == "District" else "Регион"
-                    txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(m["Growth_%"], m["Units_Delta"])]
+                    disp = get_growth_chart_display()
+                    if disp == "pct":
+                        txts = [f"{g:+.1f}%" for g in m["Growth_%"]]
+                    elif disp == "units":
+                        txts = [f"{u:+,.0f} оп." for u in m["Units_Delta"]]
+                    else:
+                        txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(m["Growth_%"], m["Units_Delta"])]
                     fig_g = px.bar(
                         m, x="Growth_%", y="Region", orientation="h",
                         color="Growth_%", color_continuous_scale=["#e74c3c", "#95a5a6", "#2ecc71"],
@@ -1066,7 +1072,13 @@ def render_last_vs_previous_quarter(
     fig = go.Figure()
     merged_chart = merged_chart.copy()
     merged_chart["Units_Delta"] = merged_chart["Last_Units"] - merged_chart["Previous_Units"]
-    txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(merged_chart["Growth_%"], merged_chart["Units_Delta"])]
+    disp = get_growth_chart_display()
+    if disp == "pct":
+        txts = [f"{g:+.1f}%" for g in merged_chart["Growth_%"]]
+    elif disp == "units":
+        txts = [f"{u:+,.0f} оп." for u in merged_chart["Units_Delta"]]
+    else:
+        txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(merged_chart["Growth_%"], merged_chart["Units_Delta"])]
     fig.add_trace(go.Bar(
         x=merged_chart["Growth_%"],
         y=merged_chart["Region"],

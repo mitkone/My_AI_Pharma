@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional
 import config
-from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color
+from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color, get_growth_chart_display
 
 
 def create_period_comparison(
@@ -315,7 +315,13 @@ def create_regional_comparison(
             if product in pivot_growth.columns:
                 pct = pivot_growth[product]
                 delta_vals = (pivot[product] - pivot_prev_reidx[product]).reindex(pivot_growth.index).fillna(0) if product in pivot.columns else pd.Series(0.0, index=pivot_growth.index)
-                txt = [f"{p:+.1f}% ({d:+,.0f} оп.)" for p, d in zip(pct, delta_vals)]
+                disp = get_growth_chart_display()
+                if disp == "pct":
+                    txt = [f"{p:+.1f}%" for p in pct]
+                elif disp == "units":
+                    txt = [f"{d:+,.0f} оп." for d in delta_vals]
+                else:
+                    txt = [f"{p:+.1f}% ({d:+,.0f} оп.)" for p, d in zip(pct, delta_vals)]
                 fig2.add_trace(go.Bar(
                     name=product,
                     x=pct.values,

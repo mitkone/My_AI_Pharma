@@ -602,6 +602,31 @@ if is_admin:
         )
 
         st.markdown("---")
+        st.markdown("**Ръст % графики – какво да се показва**")
+        cfg = get_dashboard_config()
+
+        def _save_growth_display():
+            c = get_dashboard_config()
+            c["growth_chart_display"] = st.session_state.get("admin_growth_display", "both")
+            save_config_to_json(c)
+
+        growth_opts = [
+            ("pct", "Само проценти (напр. +30.9%)"),
+            ("units", "Само опаковки (напр. +627 оп.)"),
+            ("both", "И двете (+30.9% (+627 оп.))"),
+        ]
+        current_growth = cfg.get("growth_chart_display", "both")
+        idx_growth = next((i for i, (k, _) in enumerate(growth_opts) if k == current_growth), 2)
+        st.radio(
+            "На лентите Ръст %",
+            options=[v[0] for v in growth_opts],
+            format_func=lambda x: next(lbl for k, lbl in growth_opts if k == x),
+            index=idx_growth,
+            key="admin_growth_display",
+            on_change=_save_growth_display,
+        )
+
+        st.markdown("---")
         st.markdown("**EV Index таблица – видими колони**")
         cfg = get_dashboard_config()
 

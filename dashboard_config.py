@@ -85,6 +85,8 @@ DEFAULT_DASHBOARD_CONFIG: dict[str, Any] = {
     "chart_height_evolution": 800,  # специално за EI графиката
     # Цвят на текст в лентите: "white" или "black"
     "chart_text_color": "white",
+    # Ръст % графики – какво да се показва: "pct" (само %), "units" (само оп.), "both" (и двете)
+    "growth_chart_display": "both",
     # EV Index таблица – кои колони да се показват (id -> видима)
     "ei_table_show_drug": True,
     "ei_table_show_sales_ref": True,
@@ -185,6 +187,13 @@ def get_chart_height_evolution() -> int:
     """Височина на EI графиката в px (по подразбиране 800)."""
     cfg = get_dashboard_config()
     return int(cfg.get("chart_height_evolution", 800))
+
+
+def get_growth_chart_display() -> str:
+    """Какво да се показва на Ръст % графиките: 'pct', 'units' или 'both'."""
+    cfg = get_dashboard_config()
+    v = cfg.get("growth_chart_display", "both")
+    return v if v in ("pct", "units", "both") else "both"
 
 
 def get_chart_text_color() -> str:
