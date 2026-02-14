@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional
 import config
-from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color, get_growth_chart_display
+from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color
 
 
 def create_period_comparison(
@@ -290,6 +290,21 @@ def create_regional_comparison(
 
     # 2. Графика за ръст % под опаковките (като в секция Опаковки по Brick)
     st.markdown("#### 📈 Ръст % спрямо предишно тримесечие")
+    if "_growth_display" not in st.session_state:
+        st.session_state["_growth_display"] = "pct"
+
+    def _set_growth_mode_comp():
+        st.session_state["_growth_display"] = st.session_state["growth_radio_comp"]
+
+    st.radio(
+        "Покажи по",
+        options=["pct", "units"],
+        format_func=lambda x: "Проценти" if x == "pct" else "Опаковки",
+        index=0 if st.session_state.get("_growth_display", "pct") == "pct" else 1,
+        key="growth_radio_comp",
+        horizontal=True,
+        on_change=_set_growth_mode_comp,
+    )
     prev_period = None
     if periods_fallback and period in periods_fallback:
         idx = periods_fallback.index(period)
@@ -308,23 +323,33 @@ def create_regional_comparison(
             else:
                 pivot_growth[col] = 0
         pivot_growth["_tot"] = pivot_growth[[c for c in pivot_growth.columns if c in products_list]].sum(axis=1)
-        pivot_growth = pivot_growth.sort_values("_tot", ascending=False).drop(columns=["_tot"])
         pivot_prev_reidx = pivot_prev.reindex(pivot.index).fillna(0)
+        disp = st.session_state.get("_growth_display", "pct")
+        # Изчисляваме delta за сортиране
+        first_prod = products_list[0] if products_list else None
+        if first_prod and first_prod in pivot.columns:
+            delta_col = (pivot[first_prod] - pivot_prev_reidx[first_prod]).reindex(pivot_growth.index).fillna(0)
+        else:
+            delta_col = pd.Series(0.0, index=pivot_growth.index)
+        if disp == "units":
+            pivot_growth = pivot_growth.assign(_delta=delta_col).sort_values("_delta", ascending=False).drop(columns=["_tot", "_delta"], errors="ignore")
+        else:
+            pivot_growth = pivot_growth.sort_values("_tot", ascending=False)
+        pivot_growth = pivot_growth.drop(columns=["_tot"], errors="ignore")
         fig2 = go.Figure()
         for product in products_list:
             if product in pivot_growth.columns:
                 pct = pivot_growth[product]
                 delta_vals = (pivot[product] - pivot_prev_reidx[product]).reindex(pivot_growth.index).fillna(0) if product in pivot.columns else pd.Series(0.0, index=pivot_growth.index)
-                disp = get_growth_chart_display()
                 if disp == "pct":
                     txt = [f"{p:+.1f}%" for p in pct]
-                elif disp == "units":
-                    txt = [f"{d:+,.0f} оп." for d in delta_vals]
+                    x_vals = pct.values
                 else:
-                    txt = [f"{p:+.1f}% ({d:+,.0f} оп.)" for p, d in zip(pct, delta_vals)]
+                    txt = [f"{d:+,.0f} оп." for d in delta_vals]
+                    x_vals = delta_vals.values
                 fig2.add_trace(go.Bar(
                     name=product,
-                    x=pct.values,
+                    x=x_vals,
                     y=pivot_growth.index,
                     orientation='h',
                     text=txt,
@@ -333,8 +358,9 @@ def create_regional_comparison(
                 ))
         fig2.add_vline(x=0, line_dash="dash", line_color="gray")
         n_reg = len(pivot_growth)
+        title = f"Промяна (опак.) – {period} vs {prev_period}" if disp == "units" else f"Ръст % – {period} vs {prev_period}"
         fig2.update_layout(
-            title=f"Ръст % – {period} vs {prev_period}",
+            title=title,
             xaxis_title="",
             barmode='group',
             height=max(get_chart_height(), n_reg * 32),

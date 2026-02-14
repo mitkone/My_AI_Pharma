@@ -12,7 +12,7 @@ import plotly.express as px
 from typing import List, Optional, Tuple
 import config
 from logic import is_atc_class
-from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color, get_growth_chart_display
+from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color
 
 
 def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: bool = True) -> dict:
@@ -954,6 +954,21 @@ def create_brick_charts(
 
     # Графика за ръст % – брикове (при регион/избран регион) или региони (при Всички + Региони)
     st.markdown("#### 📈 Ръст % спрямо последно тримесечие")
+    if "_growth_display" not in st.session_state:
+        st.session_state["_growth_display"] = "pct"
+
+    def _set_growth_mode_brick():
+        st.session_state["_growth_display"] = st.session_state["growth_radio_brick"]
+
+    st.radio(
+        "Покажи по",
+        options=["pct", "units"],
+        format_func=lambda x: "Проценти" if x == "pct" else "Опаковки",
+        index=0 if st.session_state.get("_growth_display", "pct") == "pct" else 1,
+        key="growth_radio_brick",
+        horizontal=True,
+        on_change=_set_growth_mode_brick,
+    )
     try:
         from logic import compute_last_vs_previous_rankings
         from data_processing import get_sorted_periods
@@ -983,30 +998,35 @@ def create_brick_charts(
                     m = m.copy()
                     m["Units_Delta"] = m["Last_Units"] - m["Previous_Units"]
                     lbl = "Брик" if grp_col == "District" else "Регион"
-                    disp = get_growth_chart_display()
-                    if disp == "pct":
-                        txts = [f"{g:+.1f}%" for g in m["Growth_%"]]
-                    elif disp == "units":
+                    disp = st.session_state.get("_growth_display", "pct")
+                    if disp == "units":
+                        m = m.sort_values("Units_Delta", ascending=False)
+                        x_vals = m["Units_Delta"]
                         txts = [f"{u:+,.0f} оп." for u in m["Units_Delta"]]
+                        colors_g = ["#2ecc71" if v >= 0 else "#e74c3c" for v in m["Units_Delta"]]
                     else:
-                        txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(m["Growth_%"], m["Units_Delta"])]
-                    fig_g = px.bar(
-                        m, x="Growth_%", y="Region", orientation="h",
-                        color="Growth_%", color_continuous_scale=["#e74c3c", "#95a5a6", "#2ecc71"],
-                        range_color=[min(m["Growth_%"].min(), -1), max(m["Growth_%"].max(), 1)],
+                        m = m.sort_values("Growth_%", ascending=False)
+                        x_vals = m["Growth_%"]
+                        txts = [f"{g:+.1f}%" for g in m["Growth_%"]]
+                        colors_g = ["#2ecc71" if v >= 0 else "#e74c3c" for v in m["Growth_%"]]
+                    import plotly.graph_objects as go
+                    fig_g = go.Figure()
+                    hover_tmpl = "<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>" if disp == "pct" else "<b>%{y}</b><br>Промяна: %{x:+,.0f} оп.<extra></extra>"
+                    fig_g.add_trace(go.Bar(
+                        x=x_vals.tolist(),
+                        y=m["Region"].tolist(),
+                        orientation="h",
+                        marker_color=colors_g,
                         text=txts,
-                        title=f"Ръст % по {lbl} – {sel_product}",
-                    )
-                    fig_g.update_traces(
                         textposition="inside",
                         textfont=dict(size=9, color=get_chart_text_color()),
-                        hovertemplate="<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>",
-                        customdata=m["Units_Delta"],
-                    )
+                        customdata=m["Units_Delta"].tolist() if disp == "pct" else [0] * len(m),
+                        hovertemplate=hover_tmpl,
+                    ))
                     fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
-                    arr = m["Region"].tolist()
-                    cat_arr = arr if get_chart_sort_order() == "desc" else arr[::-1]
+                    cat_arr = m["Region"].tolist()
                     fig_g.update_layout(
+                        title=f"Ръст % по {lbl} – {sel_product}" if disp == "pct" else f"Промяна (опак.) по {lbl} – {sel_product}",
                         height=max(get_chart_height(), len(m) * 32), showlegend=False,
                         xaxis=dict(title="", tickfont=dict(size=11), fixedrange=True),
                         yaxis_title="", coloraxis_showscale=False,
@@ -1067,28 +1087,46 @@ def render_last_vs_previous_quarter(
     st.caption(f"**Продукт:** {selected_product} | **Периоди:** {last_period} (текущ) vs {prev_period} (предишен)")
 
     st.markdown("#### 📈 Ръст % по регион")
-    merged_chart = merged.sort_values("Growth_%", ascending=True)
-    colors = ["#2ecc71" if x >= 0 else "#e74c3c" for x in merged_chart["Growth_%"]]
-    fig = go.Figure()
-    merged_chart = merged_chart.copy()
+    if "_growth_display" not in st.session_state:
+        st.session_state["_growth_display"] = "pct"
+
+    def _set_growth_mode_lastvp():
+        st.session_state["_growth_display"] = st.session_state["growth_radio_lastvp"]
+
+    st.radio(
+        "Покажи по",
+        options=["pct", "units"],
+        format_func=lambda x: "Проценти" if x == "pct" else "Опаковки",
+        index=0 if st.session_state.get("_growth_display", "pct") == "pct" else 1,
+        key="growth_radio_lastvp",
+        horizontal=True,
+        on_change=_set_growth_mode_lastvp,
+    )
+    merged_chart = merged.copy()
     merged_chart["Units_Delta"] = merged_chart["Last_Units"] - merged_chart["Previous_Units"]
-    disp = get_growth_chart_display()
-    if disp == "pct":
-        txts = [f"{g:+.1f}%" for g in merged_chart["Growth_%"]]
-    elif disp == "units":
+    disp = st.session_state.get("_growth_display", "pct")
+    if disp == "units":
+        merged_chart = merged_chart.sort_values("Units_Delta", ascending=False)
+        x_vals = merged_chart["Units_Delta"]
         txts = [f"{u:+,.0f} оп." for u in merged_chart["Units_Delta"]]
+        colors = ["#2ecc71" if v >= 0 else "#e74c3c" for v in merged_chart["Units_Delta"]]
     else:
-        txts = [f"{g:+.1f}% ({u:+,.0f} оп.)" for g, u in zip(merged_chart["Growth_%"], merged_chart["Units_Delta"])]
+        merged_chart = merged_chart.sort_values("Growth_%", ascending=False)
+        x_vals = merged_chart["Growth_%"]
+        txts = [f"{g:+.1f}%" for g in merged_chart["Growth_%"]]
+        colors = ["#2ecc71" if v >= 0 else "#e74c3c" for v in merged_chart["Growth_%"]]
+    hover_tmpl = "<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>" if disp == "pct" else "<b>%{y}</b><br>Промяна: %{x:+,.0f} оп.<extra></extra>"
+    fig = go.Figure()
     fig.add_trace(go.Bar(
-        x=merged_chart["Growth_%"],
+        x=x_vals,
         y=merged_chart["Region"],
         orientation="h",
         marker_color=colors,
         text=txts,
         textposition="inside",
         textfont=dict(size=9, color=get_chart_text_color()),
-        customdata=merged_chart["Units_Delta"],
-        hovertemplate="<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>",
+        customdata=merged_chart["Units_Delta"] if disp == "pct" else [0] * len(merged_chart),
+        hovertemplate=hover_tmpl,
     ))
     fig.add_vline(x=0, line_dash="dash", line_color="gray", line_width=1)
     fig.update_layout(
@@ -1100,7 +1138,7 @@ def render_last_vs_previous_quarter(
         dragmode=False,
         yaxis=dict(
             categoryorder="array",
-            categoryarray=merged_chart["Region"].tolist() if get_chart_sort_order() == "desc" else merged_chart["Region"].tolist()[::-1],
+            categoryarray=merged_chart["Region"].tolist(),
             tickfont=dict(size=11),
             fixedrange=True,
         ),
