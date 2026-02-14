@@ -1025,6 +1025,7 @@ def create_brick_charts(
                     ))
                     fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
                     cat_arr = m["Region"].tolist()
+                    cat_arr_ordered = cat_arr[::-1] if get_chart_sort_order() == "desc" else cat_arr
                     fig_g.update_layout(
                         title=f"Ръст % по {lbl} – {sel_product}" if disp == "pct" else f"Промяна (опак.) по {lbl} – {sel_product}",
                         height=max(get_chart_height(), len(m) * 32), showlegend=False,
@@ -1033,7 +1034,7 @@ def create_brick_charts(
                         margin={**get_chart_margins(), "t": 25, "b": 20}, dragmode=False,
                         yaxis=dict(
                             categoryorder="array",
-                            categoryarray=cat_arr,
+                            categoryarray=cat_arr_ordered,
                             tickfont=dict(size=11),
                             fixedrange=True,
                         ),
@@ -1129,6 +1130,8 @@ def render_last_vs_previous_quarter(
         hovertemplate=hover_tmpl,
     ))
     fig.add_vline(x=0, line_dash="dash", line_color="gray", line_width=1)
+    cat_arr = merged_chart["Region"].tolist()
+    cat_arr_ordered = cat_arr[::-1] if get_chart_sort_order() == "desc" else cat_arr
     fig.update_layout(
         xaxis=dict(title="", tickfont=dict(size=11), fixedrange=True),
         yaxis_title="",
@@ -1138,7 +1141,7 @@ def render_last_vs_previous_quarter(
         dragmode=False,
         yaxis=dict(
             categoryorder="array",
-            categoryarray=merged_chart["Region"].tolist(),
+            categoryarray=cat_arr_ordered,
             tickfont=dict(size=11),
             fixedrange=True,
         ),
