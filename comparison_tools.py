@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional
 import config
-from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins
+from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color
 
 
 def create_period_comparison(
@@ -322,7 +322,7 @@ def create_regional_comparison(
                     orientation='h',
                     text=txt,
                     textposition='inside',
-                    textfont=dict(size=9, color="white"),
+                    textfont=dict(size=9, color=get_chart_text_color()),
                 ))
         fig2.add_vline(x=0, line_dash="dash", line_color="gray")
         n_reg = len(pivot_growth)

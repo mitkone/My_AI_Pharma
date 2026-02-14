@@ -83,7 +83,26 @@ DEFAULT_DASHBOARD_CONFIG: dict[str, Any] = {
     "chart_margin_top": 25,
     "chart_margin_bottom": 20,
     "chart_height_evolution": 800,  # специално за EI графиката
+    # Цвят на текст в лентите: "white" или "black"
+    "chart_text_color": "white",
+    # EV Index таблица – кои колони да се показват (id -> видима)
+    "ei_table_show_drug": True,
+    "ei_table_show_sales_ref": True,
+    "ei_table_show_sales_base": True,
+    "ei_table_show_growth_pct": True,
+    "ei_table_show_class_growth_pct": True,
+    "ei_table_show_ei": True,
 }
+
+# Маппинг колони EI таблица: id -> (булгарско име, ключ в row)
+EI_TABLE_COLUMNS = [
+    ("drug", "Медикамент", "drug"),
+    ("sales_ref", "Продажби (Ref)", "sales_ref"),
+    ("sales_base", "Продажби (Base)", "sales_base"),
+    ("growth_pct", "Ръст %", "growth_pct"),
+    ("class_growth_pct", "Ръст клас %", "class_growth_pct"),
+    ("ei", "EI", "ei"),
+]
 
 
 def load_config_from_json() -> dict | None:
@@ -166,6 +185,24 @@ def get_chart_height_evolution() -> int:
     """Височина на EI графиката в px (по подразбиране 800)."""
     cfg = get_dashboard_config()
     return int(cfg.get("chart_height_evolution", 800))
+
+
+def get_chart_text_color() -> str:
+    """Цвят на текст в лентите: 'white' или 'black'."""
+    cfg = get_dashboard_config()
+    c = cfg.get("chart_text_color", "white")
+    return c if c in ("white", "black") else "white"
+
+
+def get_ei_table_visible_columns() -> list:
+    """Връща списък от (col_id, label, row_key) за видимите колони в EI таблицата."""
+    cfg = get_dashboard_config()
+    visible = []
+    for col_id, label, row_key in EI_TABLE_COLUMNS:
+        key = f"ei_table_show_{col_id}"
+        if cfg.get(key, True):
+            visible.append((col_id, label, row_key))
+    return visible if visible else [(c[0], c[1], c[2]) for c in EI_TABLE_COLUMNS[:1]]  # fallback: поне Медикамент
 
 
 def show_component_enabled(cfg: dict, component_id: str) -> bool:

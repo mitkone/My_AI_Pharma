@@ -12,7 +12,7 @@ import plotly.express as px
 from typing import List, Optional, Tuple
 import config
 from logic import is_atc_class
-from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins
+from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins, get_chart_text_color
 
 
 def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: bool = True) -> dict:
@@ -927,7 +927,7 @@ def create_brick_charts(
     fig_geo.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>%{y}<br>%{x:,.0f} опак.<extra></extra>",
         textposition="inside",
-        textfont=dict(size=10, color="white"),
+        textfont=dict(size=10, color=get_chart_text_color()),
     )
     
     fig_geo.update_layout(
@@ -989,7 +989,7 @@ def create_brick_charts(
                     )
                     fig_g.update_traces(
                         textposition="inside",
-                        textfont=dict(size=9, color="white"),
+                        textfont=dict(size=9, color=get_chart_text_color()),
                         hovertemplate="<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>",
                         customdata=m["Units_Delta"],
                     )
@@ -1069,7 +1069,7 @@ def render_last_vs_previous_quarter(
         marker_color=colors,
         text=txts,
         textposition="inside",
-        textfont=dict(size=9, color="white"),
+        textfont=dict(size=9, color=get_chart_text_color()),
         customdata=merged_chart["Units_Delta"],
         hovertemplate="<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>",
     ))

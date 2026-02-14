@@ -37,6 +37,7 @@ from dashboard_config import (
     PAGE_SECTION_IDS,
     PAGE_SECTION_LABELS,
     save_config_to_json,
+    EI_TABLE_COLUMNS,
 )
 from data_processing import load_data, get_sorted_periods
 from ui_components import (
@@ -580,6 +581,45 @@ if is_admin:
             on_change=_save_chart_layout,
         )
         st.caption("Промените се запазват веднага. Презареди страницата за преглед.")
+
+        st.markdown("---")
+        st.markdown("**Цвят на текст в графики**")
+        cfg = get_dashboard_config()
+
+        def _save_text_color():
+            c = get_dashboard_config()
+            c["chart_text_color"] = st.session_state.get("admin_chart_text_color", "white")
+            save_config_to_json(c)
+
+        st.radio(
+            "Цвят на цифри в лентите",
+            options=["white", "black"],
+            format_func=lambda x: "Бял" if x == "white" else "Черен",
+            index=0 if cfg.get("chart_text_color", "white") == "white" else 1,
+            key="admin_chart_text_color",
+            horizontal=True,
+            on_change=_save_text_color,
+        )
+
+        st.markdown("---")
+        st.markdown("**EV Index таблица – видими колони**")
+        cfg = get_dashboard_config()
+
+        def _save_ei_columns():
+            c = get_dashboard_config()
+            for col_id, _, _ in EI_TABLE_COLUMNS:
+                k = f"admin_ei_col_{col_id}"
+                if k in st.session_state:
+                    c[f"ei_table_show_{col_id}"] = st.session_state[k]
+            save_config_to_json(c)
+
+        for col_id, label, _ in EI_TABLE_COLUMNS:
+            st.checkbox(
+                label,
+                value=cfg.get(f"ei_table_show_{col_id}", True),
+                key=f"admin_ei_col_{col_id}",
+                on_change=_save_ei_columns,
+            )
 
         st.markdown("---")
         st.markdown("**Подредба на секции** – галочка = видима, ↑↓ = ред")

@@ -11,7 +11,13 @@ import plotly.graph_objects as go
 from typing import Tuple, List, Dict, Any
 import config
 from logic import is_atc_class
-from dashboard_config import get_chart_sort_order, get_chart_height_evolution, get_chart_margins
+from dashboard_config import (
+    get_chart_sort_order,
+    get_chart_height_evolution,
+    get_chart_margins,
+    get_chart_text_color,
+    get_ei_table_visible_columns,
+)
 
 
 def _get_location_label(filters: dict) -> str:
@@ -166,30 +172,53 @@ def render_evolution_index_tab(
         st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
         st.caption("Графиката показва сравнително представяне на избраното портфолио по региони за избраните периоди.")
 
-    # Таблица: Резултати по медикамент
+    # Таблица: Резултати по медикамент – колоните се избират от Admin
     st.markdown("---")
     st.markdown("**Резултати по медикамент**")
+    visible_cols = get_ei_table_visible_columns()
+    if not visible_cols:
+        visible_cols = [("drug", "Медикамент", "drug")]
+
+    def _fmt_val(r, key):
+        if key == "drug":
+            return r["drug"]
+        if key == "sales_ref":
+            return f"{int(r['sales_ref']):,}"
+        if key == "sales_base":
+            return f"{int(r['sales_base']):,}"
+        if key == "growth_pct":
+            return f"{r['growth_pct']:+.1f}%" if r["growth_pct"] is not None else "—"
+        if key == "class_growth_pct":
+            return f"{r['class_growth_pct']:+.1f}%" if r["class_growth_pct"] is not None else "—"
+        if key == "ei":
+            return f"{r['ei']:.1f}" if r["ei"] is not None else "—"
+        return "—"
+
     table_data = []
     for r in rows:
-        table_data.append({
-            "Медикамент": r["drug"],
-            "Продажби (Ref)": f"{int(r['sales_ref']):,}",
-            "Продажби (Base)": f"{int(r['sales_base']):,}",
-            "Ръст %": f"{r['growth_pct']:+.1f}%" if r["growth_pct"] is not None else "—",
-            "Ръст клас %": f"{r['class_growth_pct']:+.1f}%" if r["class_growth_pct"] is not None else "—",
-            "EI": f"{r['ei']:.1f}" if r["ei"] is not None else "—",
-        })
+        row = {}
+        for col_id, label, row_key in visible_cols:
+            row[label] = _fmt_val(r, row_key)
+        table_data.append(row)
     df_table = pd.DataFrame(table_data)
     total_sales_base = sum(r["sales_base"] for r in rows)
     total_growth = ((total_sales_ref - total_sales_base) / total_sales_base * 100) if total_sales_base > 0 else 0
-    total_row = {
-        "Медикамент": "**TOTAL**",
-        "Продажби (Ref)": f"{int(total_sales_ref):,}",
-        "Продажби (Base)": f"{int(total_sales_base):,}",
-        "Ръст %": f"{total_growth:+.1f}%",
-        "Ръст клас %": "—",
-        "EI": f"{overall_ei:.1f}" if overall_ei is not None else "—",
-    }
+    total_row = {}
+    for col_id, label, row_key in visible_cols:
+        if row_key == "drug":
+            total_row[label] = "**TOTAL**"
+        elif row_key == "sales_ref":
+            total_row[label] = f"{int(total_sales_ref):,}"
+        elif row_key == "sales_base":
+            total_row[label] = f"{int(total_sales_base):,}"
+        elif row_key == "growth_pct":
+            total_row[label] = f"{total_growth:+.1f}%"
+        elif row_key == "class_growth_pct":
+            total_row[label] = "—"
+        elif row_key == "ei":
+            total_row[label] = f"{overall_ei:.1f}" if overall_ei is not None else "—"
+        else:
+            total_row[label] = "—"
     df_table = pd.concat([df_table, pd.DataFrame([total_row])], ignore_index=True)
     st.dataframe(df_table, width="stretch", hide_index=True)
 
@@ -207,7 +236,7 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], 
         marker_color=colors,
         text=[f"{v:.1f}" for v in values],
         textposition='inside',
-        textfont=dict(size=11, color="white"),
+        textfont=dict(size=11, color=get_chart_text_color()),
     ))
     fig.add_vline(x=100, line_dash="dash", line_color="red", line_width=2)
     fig.update_layout(
