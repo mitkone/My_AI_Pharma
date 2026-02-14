@@ -509,6 +509,77 @@ if is_admin:
             key="admin_chart_sort",
             on_change=_on_sort_change,
         )
+        st.caption("Включително за EV Index (Еволюционен Индекс).")
+
+        st.markdown("---")
+        st.markdown("**Размер и позиция на графики** – настрой за телефон")
+        cfg = get_dashboard_config()
+
+        def _save_chart_layout():
+            c = get_dashboard_config()
+            c["chart_height"] = st.session_state.get("admin_chart_height", 500)
+            c["chart_margin_left"] = st.session_state.get("admin_chart_ml", 25)
+            c["chart_margin_right"] = st.session_state.get("admin_chart_mr", 65)
+            c["chart_margin_top"] = st.session_state.get("admin_chart_mt", 25)
+            c["chart_margin_bottom"] = st.session_state.get("admin_chart_mb", 20)
+            c["chart_height_evolution"] = st.session_state.get("admin_chart_hei", 800)
+            save_config_to_json(c)
+
+        st.slider(
+            "Височина на графиките (px)",
+            min_value=350,
+            max_value=700,
+            value=cfg.get("chart_height", 500),
+            step=50,
+            key="admin_chart_height",
+            on_change=_save_chart_layout,
+        )
+        st.slider(
+            "Ляв отступ (място за имена)",
+            min_value=5,
+            max_value=80,
+            value=cfg.get("chart_margin_left", 25),
+            step=5,
+            key="admin_chart_ml",
+            on_change=_save_chart_layout,
+        )
+        st.slider(
+            "Десен отступ (място за цифри)",
+            min_value=40,
+            max_value=120,
+            value=cfg.get("chart_margin_right", 65),
+            step=5,
+            key="admin_chart_mr",
+            on_change=_save_chart_layout,
+        )
+        st.slider(
+            "Горен отступ",
+            min_value=10,
+            max_value=60,
+            value=cfg.get("chart_margin_top", 25),
+            step=5,
+            key="admin_chart_mt",
+            on_change=_save_chart_layout,
+        )
+        st.slider(
+            "Долен отступ",
+            min_value=10,
+            max_value=60,
+            value=cfg.get("chart_margin_bottom", 20),
+            step=5,
+            key="admin_chart_mb",
+            on_change=_save_chart_layout,
+        )
+        st.slider(
+            "Височина EV Index графика (px)",
+            min_value=500,
+            max_value=1200,
+            value=cfg.get("chart_height_evolution", 800),
+            step=50,
+            key="admin_chart_hei",
+            on_change=_save_chart_layout,
+        )
+        st.caption("Промените се запазват веднага. Презареди страницата за преглед.")
 
         st.markdown("---")
         st.markdown("**Подредба на секции** – галочка = видима, ↑↓ = ред")

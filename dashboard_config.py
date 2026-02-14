@@ -76,6 +76,13 @@ DEFAULT_DASHBOARD_CONFIG: dict[str, Any] = {
     **{f"show_section_{sid}": True for sid in PAGE_SECTION_IDS},
     # Подредба на графиките: "desc" = най-голямо→най-малко, "asc" = най-малко→най-голямо
     "chart_sort_order": "desc",
+    # Размер и позиция на графиките (за mobile настройка)
+    "chart_height": 500,
+    "chart_margin_left": 25,
+    "chart_margin_right": 65,
+    "chart_margin_top": 25,
+    "chart_margin_bottom": 20,
+    "chart_height_evolution": 800,  # специално за EI графиката
 }
 
 
@@ -136,6 +143,29 @@ def get_chart_sort_order() -> str:
     """Връща 'desc' (най-голямо→най-малко) или 'asc' (най-малко→най-голямо)."""
     cfg = get_dashboard_config()
     return cfg.get("chart_sort_order", "desc")
+
+
+def get_chart_height() -> int:
+    """Височина на графиките в px (по подразбиране 500)."""
+    cfg = get_dashboard_config()
+    return int(cfg.get("chart_height", 500))
+
+
+def get_chart_margins() -> dict:
+    """Margin dict за графиките (l, r, t, b)."""
+    cfg = get_dashboard_config()
+    return {
+        "l": int(cfg.get("chart_margin_left", 25)),
+        "r": int(cfg.get("chart_margin_right", 65)),
+        "t": int(cfg.get("chart_margin_top", 25)),
+        "b": int(cfg.get("chart_margin_bottom", 20)),
+    }
+
+
+def get_chart_height_evolution() -> int:
+    """Височина на EI графиката в px (по подразбиране 800)."""
+    cfg = get_dashboard_config()
+    return int(cfg.get("chart_height_evolution", 800))
 
 
 def show_component_enabled(cfg: dict, component_id: str) -> bool:

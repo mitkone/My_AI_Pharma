@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from typing import Tuple, List, Dict, Any
 import config
 from logic import is_atc_class
-from dashboard_config import get_chart_sort_order
+from dashboard_config import get_chart_sort_order, get_chart_height_evolution, get_chart_margins
 
 
 def _get_location_label(filters: dict) -> str:
@@ -213,8 +213,8 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], 
     fig.update_layout(
         xaxis_title="EI",
         yaxis_title="",
-        height=800,
-        margin=dict(l=25, r=65, t=20, b=30),  # mobile: малко l, повече r за четливи цифри
+        height=get_chart_height_evolution(),
+        margin={**get_chart_margins(), "t": 20, "b": 30},
         showlegend=False,
         dragmode=False,
         xaxis=dict(zeroline=True, zerolinewidth=1),

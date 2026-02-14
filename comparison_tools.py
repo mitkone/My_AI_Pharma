@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from typing import List, Tuple, Optional
 import config
-from dashboard_config import get_chart_sort_order
+from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins
 
 
 def create_period_comparison(
@@ -150,7 +150,7 @@ def create_period_comparison(
             autorange=True,
         ),
         barmode='group',
-        height=config.MOBILE_CHART_HEIGHT,  # Mobile-first: 500px
+        height=get_chart_height(),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -281,9 +281,9 @@ def create_regional_comparison(
         categoryarray=pivot.index.tolist() if get_chart_sort_order() == "desc" else pivot.index.tolist()[::-1],
     ),
         barmode='stack',
-        height=max(config.MOBILE_CHART_HEIGHT, len(pivot) * 28),
+        height=max(get_chart_height(), len(pivot) * 28),
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
-        hovermode='closest', dragmode=False, margin=dict(l=25, r=65, t=30, b=20), font=dict(size=12),
+        hovermode='closest', dragmode=False, margin={**get_chart_margins(), "t": 30, "b": 20}, font=dict(size=12),
     )
     st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
 
@@ -330,7 +330,7 @@ def create_regional_comparison(
             title=f"Ръст % – {period} vs {prev_period}",
             xaxis_title="",
             barmode='group',
-            height=max(500, n_reg * 32),
+            height=max(get_chart_height(), n_reg * 32),
             legend_title="",
             xaxis=dict(tickfont=dict(size=11)),
             yaxis=dict(
@@ -339,7 +339,7 @@ def create_regional_comparison(
             categoryarray=pivot_growth.index.tolist() if get_chart_sort_order() == "desc" else pivot_growth.index.tolist()[::-1],
         ),
             legend=dict(orientation="h", yanchor="bottom", y=-0.35, xanchor="center", x=0.5),
-            margin=dict(l=25, r=70, t=35, b=30),
+            margin={**get_chart_margins(), "t": 35, "b": 30},
             font=dict(size=12),
         )
         st.plotly_chart(fig2, width="stretch", config=config.PLOTLY_CONFIG)

@@ -12,7 +12,7 @@ import plotly.express as px
 from typing import List, Optional, Tuple
 import config
 from logic import is_atc_class
-from dashboard_config import get_chart_sort_order
+from dashboard_config import get_chart_sort_order, get_chart_height, get_chart_margins
 
 
 def create_filters(df: pd.DataFrame, default_product: str = None, use_sidebar: bool = True) -> dict:
@@ -559,7 +559,7 @@ def create_timeline_chart(
     )
     
     fig.update_layout(
-        height=config.MOBILE_CHART_HEIGHT,
+        height=get_chart_height(),
         legend_title="",
         showlegend=True,
         hovermode="closest",
@@ -931,7 +931,7 @@ def create_brick_charts(
     )
     
     fig_geo.update_layout(
-        height=max(config.MOBILE_CHART_HEIGHT, len(df_geo_agg[group_col].unique()) * 28),
+        height=max(get_chart_height(), len(df_geo_agg[group_col].unique()) * 28),
         legend_title="",
         xaxis=dict(title="", tickfont=dict(size=11)),
         yaxis=dict(
@@ -943,7 +943,7 @@ def create_brick_charts(
         dragmode=False,
         clickmode="event+select",
         uirevision="constant",
-        margin=dict(l=25, r=65, t=30, b=20),  # mobile: малко l, повече r за четливи цифри
+        margin={**get_chart_margins(), "t": 30, "b": 20},
         font=dict(size=12),
     )
     st.plotly_chart(fig_geo, width="stretch", config=config.PLOTLY_CONFIG)
@@ -997,9 +997,9 @@ def create_brick_charts(
                     arr = m["Region"].tolist()
                     cat_arr = arr[::-1] if get_chart_sort_order() == "desc" else arr
                     fig_g.update_layout(
-                        height=max(450, len(m) * 32), showlegend=False,
+                        height=max(get_chart_height(), len(m) * 32), showlegend=False,
                         xaxis_title="", yaxis_title="", coloraxis_showscale=False,
-                        margin=dict(l=25, r=65, t=25, b=20), dragmode=False,
+                        margin={**get_chart_margins(), "t": 25, "b": 20}, dragmode=False,
                         yaxis=dict(
                             categoryorder="array",
                             categoryarray=cat_arr,
@@ -1077,8 +1077,8 @@ def render_last_vs_previous_quarter(
     fig.update_layout(
         xaxis_title="",
         yaxis_title="",
-        height=max(450, len(merged_chart) * 32),
-        margin=dict(l=25, r=65, t=20, b=30),  # mobile: малко l, повече r за % и оп.
+        height=max(get_chart_height(), len(merged_chart) * 32),
+        margin={**get_chart_margins(), "t": 20, "b": 30},
         showlegend=False,
         dragmode=False,
         yaxis=dict(
