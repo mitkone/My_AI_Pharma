@@ -1002,7 +1002,7 @@ def create_brick_charts(
                     cat_arr = arr if get_chart_sort_order() == "desc" else arr[::-1]
                     fig_g.update_layout(
                         height=max(get_chart_height(), len(m) * 32), showlegend=False,
-                        xaxis=dict(title="", fixedrange=True),
+                        xaxis=dict(title="", tickfont=dict(size=11), fixedrange=True),
                         yaxis_title="", coloraxis_showscale=False,
                         margin={**get_chart_margins(), "t": 25, "b": 20}, dragmode=False,
                         yaxis=dict(
@@ -1011,7 +1011,6 @@ def create_brick_charts(
                             tickfont=dict(size=11),
                             fixedrange=True,
                         ),
-                        xaxis=dict(tickfont=dict(size=11), fixedrange=True),
                     )
                     st.plotly_chart(fig_g, width="stretch", config=config.PLOTLY_CONFIG)
             else:
@@ -1081,7 +1080,7 @@ def render_last_vs_previous_quarter(
     ))
     fig.add_vline(x=0, line_dash="dash", line_color="gray", line_width=1)
     fig.update_layout(
-        xaxis=dict(title="", fixedrange=True),
+        xaxis=dict(title="", tickfont=dict(size=11), fixedrange=True),
         yaxis_title="",
         height=max(get_chart_height(), len(merged_chart) * 32),
         margin={**get_chart_margins(), "t": 20, "b": 30},
@@ -1093,6 +1092,5 @@ def render_last_vs_previous_quarter(
             tickfont=dict(size=11),
             fixedrange=True,
         ),
-        xaxis=dict(tickfont=dict(size=11), fixedrange=True),
     )
     st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)
