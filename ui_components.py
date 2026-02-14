@@ -926,8 +926,8 @@ def create_brick_charts(
     )
     fig_geo.update_traces(
         hovertemplate="<b>%{fullData.name}</b><br>%{y}<br>%{x:,.0f} опак.<extra></extra>",
-        textposition="outside",
-        textfont=dict(size=10),
+        textposition="inside",
+        textfont=dict(size=10, color="white"),
     )
     
     fig_geo.update_layout(
@@ -988,8 +988,8 @@ def create_brick_charts(
                         title=f"Ръст % по {lbl} – {sel_product}",
                     )
                     fig_g.update_traces(
-                        textposition="outside",
-                        textfont=dict(size=9),
+                        textposition="inside",
+                        textfont=dict(size=9, color="white"),
                         hovertemplate="<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>",
                         customdata=m["Units_Delta"],
                     )
@@ -1068,8 +1068,8 @@ def render_last_vs_previous_quarter(
         orientation="h",
         marker_color=colors,
         text=txts,
-        textposition="outside",
-        textfont=dict(size=9),
+        textposition="inside",
+        textfont=dict(size=9, color="white"),
         customdata=merged_chart["Units_Delta"],
         hovertemplate="<b>%{y}</b><br>Ръст: %{x:+.1f}%<br>Промяна: %{customdata:+,.0f} оп.<extra></extra>",
     ))

@@ -206,8 +206,8 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], 
         orientation='h',
         marker_color=colors,
         text=[f"{v:.1f}" for v in values],
-        textposition='outside',
-        textfont=dict(size=11),
+        textposition='inside',
+        textfont=dict(size=11, color="white"),
     ))
     fig.add_vline(x=100, line_dash="dash", line_color="red", line_width=2)
     fig.update_layout(

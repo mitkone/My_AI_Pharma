@@ -321,8 +321,8 @@ def create_regional_comparison(
                     y=pivot_growth.index,
                     orientation='h',
                     text=txt,
-                    textposition='outside',
-                    textfont=dict(size=9),
+                    textposition='inside',
+                    textfont=dict(size=9, color="white"),
                 ))
         fig2.add_vline(x=0, line_dash="dash", line_color="gray")
         n_reg = len(pivot_growth)
