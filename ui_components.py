@@ -573,11 +573,13 @@ def create_timeline_chart(
             title_font=dict(size=14),
             tickfont=dict(size=14),
             autorange=True,
+            fixedrange=True,
         ),
         yaxis=dict(
             title_font=dict(size=14),
             tickfont=dict(size=14),
             autorange=True,
+            fixedrange=True,
         ),
         # Легенда ДОЛУ (Mobile-first: още по-долу за да не смачква графиката)
         legend=dict(
@@ -743,7 +745,7 @@ def show_market_share_table(
         barmode='stack',
         bargap=0.1,
         xaxis_title='Market Share (%)',
-        xaxis=dict(autorange=True, title_font=dict(size=14), tickfont=dict(size=12)),
+        xaxis=dict(autorange=True, title_font=dict(size=14), tickfont=dict(size=12), fixedrange=True),
         yaxis_title=period_col,
         yaxis=dict(
             categoryorder='array',
@@ -751,6 +753,7 @@ def show_market_share_table(
             autorange=True,
             title_font=dict(size=14),
             tickfont=dict(size=12),
+            fixedrange=True,
         ),
         showlegend=True,
         legend=dict(
@@ -933,10 +936,11 @@ def create_brick_charts(
     fig_geo.update_layout(
         height=max(get_chart_height(), len(df_geo_agg[group_col].unique()) * 28),
         legend_title="",
-        xaxis=dict(title="", tickfont=dict(size=11)),
+        xaxis=dict(title="", tickfont=dict(size=11), fixedrange=True),
         yaxis=dict(
             title="", tickfont=dict(size=11),
-            categoryorder="total descending" if get_chart_sort_order() == "desc" else "total ascending",
+            categoryorder="total ascending" if get_chart_sort_order() == "desc" else "total descending",
+            fixedrange=True,
         ),
         legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5),
         hovermode='closest',
@@ -995,17 +999,19 @@ def create_brick_charts(
                     )
                     fig_g.add_vline(x=0, line_dash="dash", line_color="gray")
                     arr = m["Region"].tolist()
-                    cat_arr = arr[::-1] if get_chart_sort_order() == "desc" else arr
+                    cat_arr = arr if get_chart_sort_order() == "desc" else arr[::-1]
                     fig_g.update_layout(
                         height=max(get_chart_height(), len(m) * 32), showlegend=False,
-                        xaxis_title="", yaxis_title="", coloraxis_showscale=False,
+                        xaxis=dict(title="", fixedrange=True),
+                        yaxis_title="", coloraxis_showscale=False,
                         margin={**get_chart_margins(), "t": 25, "b": 20}, dragmode=False,
                         yaxis=dict(
                             categoryorder="array",
                             categoryarray=cat_arr,
                             tickfont=dict(size=11),
+                            fixedrange=True,
                         ),
-                        xaxis=dict(tickfont=dict(size=11)),
+                        xaxis=dict(tickfont=dict(size=11), fixedrange=True),
                     )
                     st.plotly_chart(fig_g, width="stretch", config=config.PLOTLY_CONFIG)
             else:
@@ -1075,7 +1081,7 @@ def render_last_vs_previous_quarter(
     ))
     fig.add_vline(x=0, line_dash="dash", line_color="gray", line_width=1)
     fig.update_layout(
-        xaxis_title="",
+        xaxis=dict(title="", fixedrange=True),
         yaxis_title="",
         height=max(get_chart_height(), len(merged_chart) * 32),
         margin={**get_chart_margins(), "t": 20, "b": 30},
@@ -1083,9 +1089,10 @@ def render_last_vs_previous_quarter(
         dragmode=False,
         yaxis=dict(
             categoryorder="array",
-            categoryarray=merged_chart["Region"].tolist()[::-1] if get_chart_sort_order() == "desc" else merged_chart["Region"].tolist(),
+            categoryarray=merged_chart["Region"].tolist() if get_chart_sort_order() == "desc" else merged_chart["Region"].tolist()[::-1],
             tickfont=dict(size=11),
+            fixedrange=True,
         ),
-        xaxis=dict(tickfont=dict(size=11)),
+        xaxis=dict(tickfont=dict(size=11), fixedrange=True),
     )
     st.plotly_chart(fig, width="stretch", config=config.PLOTLY_CONFIG)

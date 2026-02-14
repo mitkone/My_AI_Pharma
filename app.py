@@ -849,7 +849,13 @@ for comp_id in cfg.get("component_order", list(COMPONENT_IDS)):
                     import plotly.express as px
                     trend_df = df_chart.groupby("Quarter", as_index=False)["Units"].sum()
                     fig_t = px.line(trend_df, x="Quarter", y="Units", title="Тренд по периоди (избрани продукти)")
-                    fig_t.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10), dragmode=False)
+                    fig_t.update_layout(
+                        height=350,
+                        margin=dict(l=10, r=10, t=40, b=10),
+                        dragmode=False,
+                        xaxis=dict(fixedrange=True),
+                        yaxis=dict(fixedrange=True),
+                    )
                     st.plotly_chart(fig_t, width="stretch", config=config.PLOTLY_CONFIG)
                 except Exception:
                     st.caption("Недостатъчно данни за графика.")

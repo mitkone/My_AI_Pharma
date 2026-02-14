@@ -223,7 +223,6 @@ def render_evolution_index_tab(
     st.dataframe(df_table, width="stretch", hide_index=True)
 
 
-@st.cache_resource(show_spinner=False)
 def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], yaxis_title: str = "Регион") -> go.Figure:
     """Създава Plotly фигура за EI по регион или брик."""
     colors = ["#2ecc71" if v >= 100 else "#e74c3c" for v in values]
@@ -246,10 +245,11 @@ def _build_ei_region_figure(labels: Tuple[str, ...], values: Tuple[float, ...], 
         margin={**get_chart_margins(), "t": 20, "b": 30},
         showlegend=False,
         dragmode=False,
-        xaxis=dict(zeroline=True, zerolinewidth=1),
+        xaxis=dict(zeroline=True, zerolinewidth=1, fixedrange=True),
         yaxis=dict(
-        tickfont=dict(size=12),
-        categoryorder="total descending" if get_chart_sort_order() == "desc" else "total ascending",
-    ),
+            tickfont=dict(size=12),
+            categoryorder="total ascending" if get_chart_sort_order() == "desc" else "total descending",
+            fixedrange=True,
+        ),
     )
     return fig

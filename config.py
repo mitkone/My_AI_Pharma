@@ -78,10 +78,10 @@ MARKET_SHARE_CHART_HEIGHT_MOBILE = 500  # Фиксирана височина �
 TIMELINE_CHART_HEIGHT = 500
 COMPARISON_CHART_HEIGHT = 500
 
-# Plotly mobile config - scroll zoom off, no toolbar, sticky tooltips
+# Plotly mobile config - scroll zoom off (scroll не zoom-ва), no toolbar
 PLOTLY_CONFIG = {
     "scrollZoom": False,
-    "displayModeBar": False,   # Hide floating menu bar; tooltip stays until click elsewhere
+    "displayModeBar": False,
     "staticPlot": False,
     "responsive": True,
 }
